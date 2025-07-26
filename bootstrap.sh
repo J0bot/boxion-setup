@@ -32,10 +32,9 @@ DOMAIN="${DOMAIN_INPUT:-tunnel.milkywayhub.org}"
 
 # Vérification et conseils selon le type de domaine
 if [[ "$DOMAIN" == "tunnel.milkywayhub.org" ]]; then
-  echo "⚠️  ATTENTION: Vous utilisez le domaine par défaut"
-  echo "    → Ce domaine ne pointe pas vers votre serveur!"
-  echo "    → Les clients ne pourront pas se connecter"
-  echo "    → Configurez un enregistrement DNS A/AAAA vers ce serveur"
+  echo "ℹ️  Domaine par défaut: $DOMAIN"
+  echo "    → Assurez-vous que ce domaine pointe vers ce serveur"
+  echo "    → Configurez un enregistrement DNS A/AAAA si nécessaire"
 elif [[ "$DOMAIN" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   echo "ℹ️  Mode IP détecté: $DOMAIN"
   echo "    → Parfait pour les tests, pas besoin de DNS"
