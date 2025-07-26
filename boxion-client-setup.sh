@@ -1,9 +1,40 @@
 #!/usr/bin/env bash
 set -euo pipefail
-WG_IF=wg0; WG_DIR=/etc/wireguard
-API="https://tunnel.milkywayhub.org/api/peers"
-TOKEN="PLACE_YOUR_TOKEN"
+
+echo "🚀 Boxion VPN Client Setup"
+echo "========================"
+
+# ====== Configuration ======
+WG_IF=wg0
+WG_DIR=/etc/wireguard
+DOMAIN="${DOMAIN:-}"
+TOKEN="${TOKEN:-}"
 NAME="${HOSTNAME:-boxion}-$(date +%s)"
+
+# ====== Mode interactif si paramètres manquants ======
+if [[ -z "${DOMAIN}" ]]; then
+  echo "🌐 Configuration du serveur"
+  read -p "Domaine du serveur [tunnel.milkywayhub.org]: " DOMAIN_INPUT
+  DOMAIN="${DOMAIN_INPUT:-tunnel.milkywayhub.org}"
+fi
+
+if [[ -z "${TOKEN}" ]] || [[ "${TOKEN}" == "PLACE_YOUR_TOKEN" ]]; then
+  echo "🔐 Configuration du token API"
+  echo "Obtenez votre token depuis l'administrateur du serveur $DOMAIN"
+  read -p "Token API: " TOKEN
+fi
+
+# Détection du protocole et construction de l'URL API
+echo "🔍 Connexion à: $DOMAIN"
+if curl -fsSL --max-time 5 "https://$DOMAIN" >/dev/null 2>&1; then
+  API="https://$DOMAIN/api/peers"
+  echo "🔒 Utilisation HTTPS"
+else
+  API="http://$DOMAIN/api/peers"
+  echo "⚠️  Utilisation HTTP (pas de TLS)"
+fi
+
+echo "🔐 Token: ${TOKEN:0:8}..." # Affiche seulement les 8 premiers caractères
 
 apt-get update -qq
 apt-get install -y wireguard-tools jq

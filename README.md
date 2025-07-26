@@ -30,20 +30,57 @@ boxion-api/
 └─ boxion-client-setup.sh             # Script client Boxion
 ```
 
-## Installation serveur
+## 🚀 Installation Ultra-Simple
 
-### Prérequis
+### Mode FULL AUTO (Recommandé)
 
-- Serveur Debian/Ubuntu avec accès root
-- Nom de domaine pointant vers le serveur
-- Préfixe IPv6 /64 routé vers le serveur
-
-### Installation
+**🖥️ Serveur VPS (Debian/Ubuntu) - Une seule commande :**
 
 ```bash
+curl -fsSL https://raw.githubusercontent.com/J0bot/boxion-setup/main/bootstrap.sh | bash
+```
+
+**📱 Client Boxion - Une seule commande :**
+
+```bash
+TOKEN='VOTRE_TOKEN' bash -c "$(curl -fsSL https://raw.githubusercontent.com/J0bot/boxion-setup/main/bootstrap_client.sh)"
+```
+
+*Le serveur vous donnera la commande client exacte avec le bon token !*
+
+---
+
+### Mode Manuel (Avancé)
+
+#### Prérequis
+- Serveur Debian/Ubuntu avec accès root
+- Nom de domaine pointant vers le serveur (ou utiliser `tunnel.milkywayhub.org`)
+- Préfixe IPv6 /64 routé vers le serveur
+
+#### Installation serveur
+
+```bash
+# Clone du repository
 git clone https://github.com/J0bot/boxion-setup.git boxion-api
 cd boxion-api
-sudo ./setup.sh --domain tunnel.milkywayhub.org --token "ULTRA_SECRET_TOKEN_32_CHARS_MIN" --prefix "2a0c:xxxx:xxxx:abcd" --port 51820
+
+# Installation interactive (recommandé)
+sudo ./setup.sh
+
+# Ou installation avec paramètres
+sudo ./setup.sh --domain tunnel.milkywayhub.org --token "VOTRE_TOKEN" --prefix "2a0c:xxxx:xxxx:abcd"
+```
+
+#### Installation client
+
+```bash
+# Télécharger et exécuter (interactif)
+wget https://raw.githubusercontent.com/J0bot/boxion-setup/main/boxion-client-setup.sh
+chmod +x boxion-client-setup.sh
+sudo ./boxion-client-setup.sh
+
+# Ou avec variables d'environnement
+TOKEN="VOTRE_TOKEN" DOMAIN="tunnel.milkywayhub.org" sudo ./boxion-client-setup.sh
 ```
 
 ### Paramètres disponibles

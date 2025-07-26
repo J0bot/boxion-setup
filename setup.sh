@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+echo "🚀 Boxion VPN Server Setup"
+echo "========================="
+
 # ====== paramètres (flags ou interactif) ======
 WG_IF=${WG_IF:-wg0}
 PORT=${PORT:-51820}
-DOMAIN=${DOMAIN:-tunnel.milkywayhub.org}
+DOMAIN=${DOMAIN:-}
 WAN_IF=${WAN_IF:-$(ip r | awk '/default/ {print $5; exit}')}
 API_TOKEN=${API_TOKEN:-}
 IPV6_PREFIX=${IPV6_PREFIX:-}      # ex: 2a0c:xxxx:xxxx:abcd
@@ -23,6 +26,43 @@ while [[ $# -gt 0 ]]; do
     *) echo "Unknown arg: $1"; exit 1;;
   esac
 done
+
+# ====== Mode interactif si paramètres manquants ======
+if [[ -z "${DOMAIN}" ]]; then
+  echo "🌐 Configuration du domaine"
+  read -p "Nom de domaine [tunnel.milkywayhub.org]: " DOMAIN_INPUT
+  DOMAIN="${DOMAIN_INPUT:-tunnel.milkywayhub.org}"
+  if [[ "$DOMAIN" == "tunnel.milkywayhub.org" ]]; then
+    echo "⚠️  Utilisation du domaine par défaut. Assurez-vous qu'il pointe vers ce serveur !"
+  fi
+fi
+
+if [[ -z "${API_TOKEN}" ]]; then
+  echo "🔐 Configuration du token API"
+  read -p "Token API (laisser vide pour génération automatique): " TOKEN_INPUT
+  if [[ -n "$TOKEN_INPUT" ]]; then
+    API_TOKEN="$TOKEN_INPUT"
+  else
+    echo "🔐 Génération d'un token sécurisé..."
+    API_TOKEN=$(openssl rand -hex 32)
+    echo "Token généré: $API_TOKEN"
+  fi
+fi
+
+if [[ -z "${IPV6_PREFIX}" ]]; then
+  echo "🌐 Configuration IPv6"
+  # Tentative d'auto-détection
+  V6=$(ip -6 addr show dev "$WAN_IF" scope global | awk '/inet6/ && !/temporary/ {print $2; exit}' | cut -d/ -f1)
+  if [[ -n "$V6" ]]; then
+    AUTO_PREFIX=$(printf "%s:%s:%s:%s" $(echo "$V6" | awk -F: '{print $1,$2,$3,$4}'))
+    echo "Préfixe IPv6 détecté: ${AUTO_PREFIX}::/64"
+    read -p "Préfixe IPv6 /64 [${AUTO_PREFIX}]: " PREFIX_INPUT
+    IPV6_PREFIX="${PREFIX_INPUT:-$AUTO_PREFIX}"
+  else
+    echo "⚠️  Aucune IPv6 globale détectée sur $WAN_IF"
+    read -p "Préfixe IPv6 /64 (ex: 2a0c:xxxx:xxxx:abcd): " IPV6_PREFIX
+  fi
+fi
 
 [[ -z "${API_TOKEN}" ]] && { echo "ERROR: --token requis"; exit 1; }
 [[ -z "${IPV6_PREFIX}" ]] && { echo "ERROR: --prefix (préfixe IPv6 /64) requis"; exit 1; }
