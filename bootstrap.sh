@@ -51,27 +51,65 @@ EMAIL="${EMAIL_INPUT:-admin@${DOMAIN}}"
 
 echo "🔍 Auto-détection des paramètres réseau..."
 
-# ====== Auto-détection réseau ======
-# Préférer une interface avec IPv6 globale pour OpenStack multi-IP
-WAN_IF_CANDIDATES=$(ip r | awk '/default/ {print $5}')
-WAN_IF=""
-V6=""
+# ====== Sélection interface réseau ======
+echo "📡 Interfaces réseau disponibles:"
+echo
 
-for iface in $WAN_IF_CANDIDATES; do
-  # Vérifier si cette interface a une IPv6 globale
-  ipv6_addr=$(ip -6 addr show dev "$iface" scope global | awk '/inet6/ && !/temporary/ {print $2; exit}' | cut -d/ -f1)
-  if [[ -n "$ipv6_addr" ]]; then
-    WAN_IF="$iface"
-    V6="$ipv6_addr"
-    echo "📡 Interface WAN détectée: $WAN_IF (avec IPv6)"
-    break
-  fi
-done
+# Lister toutes les interfaces avec leurs adresses
+interfaces=()
+while IFS= read -r line; do
+    if [[ $line =~ ^[0-9]+: ]]; then
+        iface=$(echo "$line" | awk -F': ' '{print $2}' | awk '{print $1}')
+        if [[ "$iface" != "lo" ]]; then
+            ipv4=$(ip -4 addr show dev "$iface" 2>/dev/null | awk '/inet / && !/127.0.0.1/ {print $2; exit}' | cut -d/ -f1)
+            ipv6=$(ip -6 addr show dev "$iface" scope global 2>/dev/null | awk '/inet6/ && !/temporary/ {print $2; exit}' | cut -d/ -f1)
+            
+            interfaces+=("$iface")
+            printf "  %s) %s" "${#interfaces[@]}" "$iface"
+            [[ -n "$ipv4" ]] && printf " - IPv4: %s" "$ipv4"
+            [[ -n "$ipv6" ]] && printf " - IPv6: %s" "$ipv6"
+            echo
+        fi
+    fi
+done < <(ip link show)
 
-# Si aucune interface avec IPv6 trouvée, prendre la première par défaut
-if [[ -z "$WAN_IF" ]]; then
-  WAN_IF=$(ip r | awk '/default/ {print $5; exit}')
-  echo "📡 Interface WAN détectée: $WAN_IF (sans IPv6)"
+echo
+echo "  0) Auto-détection (recommandé)"
+echo
+read -p "📡 Choisissez l'interface WAN [0]: " IFACE_CHOICE
+IFACE_CHOICE="${IFACE_CHOICE:-0}"
+
+# Traitement du choix
+if [[ "$IFACE_CHOICE" == "0" ]] || [[ -z "$IFACE_CHOICE" ]]; then
+    # Auto-détection: préférer une interface avec IPv6 globale
+    WAN_IF_CANDIDATES=$(ip r | awk '/default/ {print $5}')
+    WAN_IF=""
+    V6=""
+    
+    for iface in $WAN_IF_CANDIDATES; do
+        ipv6_addr=$(ip -6 addr show dev "$iface" scope global | awk '/inet6/ && !/temporary/ {print $2; exit}' | cut -d/ -f1)
+        if [[ -n "$ipv6_addr" ]]; then
+            WAN_IF="$iface"
+            V6="$ipv6_addr"
+            echo "📡 Interface WAN auto-détectée: $WAN_IF (avec IPv6)"
+            break
+        fi
+    done
+    
+    # Si aucune interface avec IPv6, prendre la première par défaut
+    if [[ -z "$WAN_IF" ]]; then
+        WAN_IF=$(ip r | awk '/default/ {print $5; exit}')
+        echo "📡 Interface WAN auto-détectée: $WAN_IF (sans IPv6)"
+    fi
+elif [[ "$IFACE_CHOICE" =~ ^[0-9]+$ ]] && [[ "$IFACE_CHOICE" -ge 1 ]] && [[ "$IFACE_CHOICE" -le "${#interfaces[@]}" ]]; then
+    # Choix manuel valide
+    WAN_IF="${interfaces[$((IFACE_CHOICE-1))]}"
+    V6=$(ip -6 addr show dev "$WAN_IF" scope global | awk '/inet6/ && !/temporary/ {print $2; exit}' | cut -d/ -f1)
+    echo "📡 Interface WAN sélectionnée: $WAN_IF"
+else
+    echo "⚠️  Choix invalide, utilisation de l'auto-détection"
+    WAN_IF=$(ip r | awk '/default/ {print $5; exit}')
+    echo "📡 Interface WAN par défaut: $WAN_IF"
 fi
 
 # Auto-détection du préfixe IPv6 /64
