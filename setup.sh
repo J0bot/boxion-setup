@@ -70,7 +70,7 @@ fi
 # ====== paquets ======
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
-apt-get install -y wireguard iptables php-fpm php-cli php-sqlite3 nginx jq
+apt-get install -y wireguard iptables php-fpm php-cli php-sqlite3 nginx jq sqlite3
 
 # ====== sysctl et firewall ======
 cat >/etc/sysctl.d/99-wireguard.conf <<EOF
