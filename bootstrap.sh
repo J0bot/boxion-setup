@@ -8,16 +8,20 @@ set -euo pipefail
 echo "🚀 Boxion VPN Server Bootstrap - Mode Full Auto"
 echo "=============================================="
 
+# ====== Initialisation des variables ======
+DOMAIN="${DOMAIN:-}"
+EMAIL="${EMAIL:-}"
+
 # ====== Détection/Demande des paramètres ======
 read -p "🌐 Nom de domaine [tunnel.milkywayhub.org]: " DOMAIN_INPUT
-DOMAIN="${DOMAIN_INPUT:-${DOMAIN:-tunnel.milkywayhub.org}}"
+DOMAIN="${DOMAIN_INPUT:-tunnel.milkywayhub.org}"
 
 if [[ "$DOMAIN" == "tunnel.milkywayhub.org" ]]; then
   echo "⚠️  Vous utilisez le domaine par défaut. Assurez-vous qu'il pointe vers ce serveur !"
 fi
 
 read -p "📧 Email pour Let's Encrypt [admin@${DOMAIN}]: " EMAIL_INPUT
-EMAIL="${EMAIL_INPUT:-${EMAIL:-admin@${DOMAIN}}}"
+EMAIL="${EMAIL_INPUT:-admin@${DOMAIN}}"
 
 echo "🔍 Auto-détection des paramètres réseau..."
 
