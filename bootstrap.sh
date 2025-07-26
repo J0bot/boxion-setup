@@ -48,7 +48,7 @@ TOKEN=$(openssl rand -hex 32)
 echo "📦 Installation des dépendances..."
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
-apt-get install -y git jq curl
+apt-get install -y git jq curl openssl
 
 # ====== Clone/Update repo ======
 REPO_DIR="/root/boxion-api"
@@ -70,11 +70,18 @@ chmod +x setup.sh
 # ====== Configuration TLS ======
 echo "🔒 Configuration TLS avec Let's Encrypt..."
 apt-get install -y certbot python3-certbot-nginx >/dev/null 2>&1 || true
+# Test de connectivité avant TLS
+echo "🔍 Test de connectivité DNS pour $DOMAIN..."
+if ! nslookup "$DOMAIN" >/dev/null 2>&1; then
+  echo "⚠️  Attention: DNS pour $DOMAIN non résolu. TLS peut échouer."
+fi
+
 if certbot --nginx -d "$DOMAIN" --redirect -n --agree-tos -m "$EMAIL" 2>/dev/null; then
   echo "✅ TLS configuré avec succès"
   CLIENT_URL="https://$DOMAIN"
 else
   echo "⚠️  TLS échoué, utilisation HTTP"
+  echo "💡 Pour réparer plus tard: certbot --nginx -d $DOMAIN"
   CLIENT_URL="http://$DOMAIN"
 fi
 
