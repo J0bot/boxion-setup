@@ -33,11 +33,29 @@ EMAIL="${EMAIL_INPUT:-admin@${DOMAIN}}"
 echo "🔍 Auto-détection des paramètres réseau..."
 
 # ====== Auto-détection réseau ======
-WAN_IF=$(ip r | awk '/default/ {print $5; exit}')
-echo "📡 Interface WAN détectée: $WAN_IF"
+# Préférer une interface avec IPv6 globale pour OpenStack multi-IP
+WAN_IF_CANDIDATES=$(ip r | awk '/default/ {print $5}')
+WAN_IF=""
+V6=""
+
+for iface in $WAN_IF_CANDIDATES; do
+  # Vérifier si cette interface a une IPv6 globale
+  ipv6_addr=$(ip -6 addr show dev "$iface" scope global | awk '/inet6/ && !/temporary/ {print $2; exit}' | cut -d/ -f1)
+  if [[ -n "$ipv6_addr" ]]; then
+    WAN_IF="$iface"
+    V6="$ipv6_addr"
+    echo "📡 Interface WAN détectée: $WAN_IF (avec IPv6)"
+    break
+  fi
+done
+
+# Si aucune interface avec IPv6 trouvée, prendre la première par défaut
+if [[ -z "$WAN_IF" ]]; then
+  WAN_IF=$(ip r | awk '/default/ {print $5; exit}')
+  echo "📡 Interface WAN détectée: $WAN_IF (sans IPv6)"
+fi
 
 # Auto-détection du préfixe IPv6 /64
-V6=$(ip -6 addr show dev "$WAN_IF" scope global | awk '/inet6/ && !/temporary/ {print $2; exit}' | cut -d/ -f1)
 if [[ -n "$V6" ]]; then
   PREFIX=$(printf "%s:%s:%s:%s" $(echo "$V6" | awk -F: '{print $1,$2,$3,$4}'))
   echo "🌐 Préfixe IPv6 détecté: ${PREFIX}::/64"
