@@ -30,6 +30,40 @@ boxion-api/
 └─ boxion-client-setup.sh             # Script client Boxion
 ```
 
+## 🔥 Ports Firewall à Ouvrir
+
+**IMPORTANT:** Ouvrez ces ports sur votre firewall/cloud AVANT l'installation :
+
+### 📡 Ports Requis
+- **UDP 51820** - WireGuard (port VPN principal)
+- **TCP 80** - HTTP (API et Let's Encrypt)
+- **TCP 443** - HTTPS (API sécurisée)
+- **TCP 22** - SSH (administration)
+
+### ☁️ Configuration Cloud/VPS
+
+**OpenStack / OVH / Scaleway :**
+```
+Groupe de sécurité :
+- Ingress UDP 51820 (0.0.0.0/0)
+- Ingress TCP 80 (0.0.0.0/0) 
+- Ingress TCP 443 (0.0.0.0/0)
+- Ingress TCP 22 (votre IP)
+```
+
+**AWS Security Group :**
+```
+Inbound Rules :
+- UDP 51820 Source: 0.0.0.0/0
+- TCP 80 Source: 0.0.0.0/0
+- TCP 443 Source: 0.0.0.0/0
+- TCP 22 Source: Your IP
+```
+
+⚠️ **Sans ces ports ouverts, les clients ne pourront pas se connecter !**
+
+---
+
 ## 🚀 Installation Ultra-Simple
 
 ### Mode FULL AUTO (Recommandé)

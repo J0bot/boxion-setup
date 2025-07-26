@@ -104,6 +104,7 @@ echo
 echo "🎉 ============ BOXION SERVER READY ============"
 echo "🌐 Domaine: $DOMAIN"
 echo "🔐 API Token: $TOKEN"
+echo "📝 Token complet: $TOKEN"
 echo "📡 API URL: ${CLIENT_URL}/api/peers"
 echo "🔧 Interface: $WAN_IF"
 echo "🌐 Préfixe IPv6: ${PREFIX}::/64"
