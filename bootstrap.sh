@@ -8,6 +8,13 @@ set -euo pipefail
 echo "🚀 Boxion VPN Server Bootstrap - Mode Full Auto"
 echo "=============================================="
 
+# ====== Vérification permissions root ======
+if [[ $EUID -ne 0 ]]; then
+   echo "❌ Ce script doit être exécuté en tant que root"
+   echo "💡 Relancez avec: curl -fsSL https://raw.githubusercontent.com/J0bot/boxion-setup/main/bootstrap.sh | sudo bash"
+   exit 1
+fi
+
 # ====== Initialisation des variables ======
 DOMAIN="${DOMAIN:-}"
 EMAIL="${EMAIL:-}"

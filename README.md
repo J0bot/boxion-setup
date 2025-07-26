@@ -37,8 +37,10 @@ boxion-api/
 **🖥️ Serveur VPS (Debian/Ubuntu) - Une seule commande :**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/J0bot/boxion-setup/main/bootstrap.sh | bash
+curl -fsSL https://raw.githubusercontent.com/J0bot/boxion-setup/main/bootstrap.sh | sudo bash
 ```
+
+*⚠️ Nécessite les permissions root/sudo pour l'installation des paquets*
 
 **📱 Client Boxion - Une seule commande :**
 
