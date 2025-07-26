@@ -1,0 +1,13 @@
+[Unit]
+Description=Rejoue peers WireGuard et NDP au boot
+After=network-online.target wg-quick@wg0.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+Environment=WG_IF=wg0
+Environment=WAN_IF=eth0
+ExecStart=/var/www/boxion-api/bin/replay_ndp.sh
+
+[Install]
+WantedBy=multi-user.target
