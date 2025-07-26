@@ -20,12 +20,32 @@ DOMAIN="${DOMAIN:-}"
 EMAIL="${EMAIL:-}"
 
 # ====== Détection/Demande des paramètres ======
-read -p "🌐 Nom de domaine [tunnel.milkywayhub.org]: " DOMAIN_INPUT
+echo "🌐 Configuration du domaine pour l'API Boxion"
+echo "Options disponibles:"
+echo "  1. Votre propre domaine (ex: vpn.mondomaine.com)"
+echo "  2. Adresse IP publique de ce serveur (pour tests)"
+echo "  3. Domaine par défaut (tunnel.milkywayhub.org)"
+echo
+
+read -p "🌐 Nom de domaine ou IP [tunnel.milkywayhub.org]: " DOMAIN_INPUT
 DOMAIN="${DOMAIN_INPUT:-tunnel.milkywayhub.org}"
 
+# Vérification et conseils selon le type de domaine
 if [[ "$DOMAIN" == "tunnel.milkywayhub.org" ]]; then
-  echo "⚠️  Vous utilisez le domaine par défaut. Assurez-vous qu'il pointe vers ce serveur !"
+  echo "⚠️  ATTENTION: Vous utilisez le domaine par défaut"
+  echo "    → Ce domaine ne pointe pas vers votre serveur!"
+  echo "    → Les clients ne pourront pas se connecter"
+  echo "    → Configurez un enregistrement DNS A/AAAA vers ce serveur"
+elif [[ "$DOMAIN" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo "ℹ️  Mode IP détecté: $DOMAIN"
+  echo "    → Parfait pour les tests, pas besoin de DNS"
+  echo "    → Les certificats TLS ne fonctionneront pas"
+else
+  echo "✅ Domaine personnalisé: $DOMAIN"
+  echo "    → Assurez-vous que ce domaine pointe vers ce serveur"
+  echo "    → Vérifiez avec: nslookup $DOMAIN"
 fi
+echo
 
 read -p "📧 Email pour Let's Encrypt [admin@${DOMAIN}]: " EMAIL_INPUT
 EMAIL="${EMAIL_INPUT:-admin@${DOMAIN}}"
