@@ -240,8 +240,19 @@ SV_PUB=$(cat /etc/wireguard/server_public.key)
 
 # ====== code app ======
 APP=/var/www/boxion-api
-mkdir -p ${APP}/{api,bin,sql,nginx,systemd,sudoers}
-chown -R www-data:www-data ${APP}
+echo "📁 Création répertoires API..."
+if ! mkdir -p ${APP}/{api,bin,sql,nginx,systemd,sudoers} 2>/dev/null; then
+    echo "❌ Erreur création répertoires API: ${APP}"
+    echo "💡 Vérifiez permissions /var/www/ et espace disque"
+    exit 1
+fi
+echo "✅ Répertoires API créés: ${APP}"
+if ! chown -R www-data:www-data ${APP} 2>/dev/null; then
+    echo "❌ Erreur permissions répertoires API"
+    echo "💡 Vérifiez que www-data existe"
+    exit 1
+fi
+echo "✅ Permissions API configurées"
 
 # -------- bin: wrappers sudo --------
 cat >${APP}/bin/wg_add_peer.sh <<'EOF'
@@ -402,7 +413,20 @@ if ($method==='DELETE' && preg_match('#^/api/peers/([a-zA-Z0-9._-]+)$#',$path,$m
 
 abort(404,'no route');
 EOF
-chown -R www-data:www-data ${APP}/api
+
+# Vérification critique API créée
+if [ ! -f "${APP}/api/index.php" ]; then
+    echo "❌ ERREUR CRITIQUE: API index.php non créée !"
+    echo "💡 Vérifiez l'espace disque et les permissions"
+    exit 1
+fi
+echo "✅ API index.php créée avec succès"
+
+if ! chown -R www-data:www-data ${APP}/api 2>/dev/null; then
+    echo "❌ Erreur permissions API"
+    exit 1
+fi
+echo "✅ Permissions API définies"
 
 # -------- Dashboard Web --------
 echo "🌐 Installation du dashboard web..."
