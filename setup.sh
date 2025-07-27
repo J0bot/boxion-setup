@@ -8,7 +8,22 @@ echo "========================="
 WG_IF=${WG_IF:-wg0}
 PORT=${PORT:-51820}
 DOMAIN=${DOMAIN:-}
-WAN_IF=${WAN_IF:-$(ip r | awk '/default/ {print $5; exit}')}
+# Auto-détection interface WAN robuste
+WAN_IF_DETECTED=$(ip r | awk '/default/ {print $5; exit}' 2>/dev/null)
+if [[ -z "$WAN_IF_DETECTED" ]]; then
+    echo "⚠️  Pas de route par défaut détectée"
+    # Fallback: première interface avec IPv4 globale
+    WAN_IF_DETECTED=$(ip -4 addr show scope global | awk -F': ' '/^[0-9]+:/ && !/lo:/ {print $2; exit}')
+    echo "💡 Interface fallback: $WAN_IF_DETECTED"
+fi
+WAN_IF=${WAN_IF:-$WAN_IF_DETECTED}
+
+# Validation interface WAN critique
+if [[ -z "$WAN_IF" ]]; then
+    echo "❌ Erreur: Aucune interface réseau détectée"
+    echo "💡 Spécifiez manuellement: --wan-if eth0"
+    exit 1
+fi
 API_TOKEN=${API_TOKEN:-}
 IPV6_PREFIX=${IPV6_PREFIX:-}      # ex: 2a0c:xxxx:xxxx:abcd
 POOL_BITS=${POOL_BITS:-16}        # /112 = 16 bits libres
@@ -85,7 +100,13 @@ iptables -C INPUT -p udp --dport "${PORT}" -j ACCEPT 2>/dev/null || iptables -A 
 
 # ====== WG serveur (si absent) ======
 echo "🔧 Configuration WireGuard serveur..."
-mkdir -p /etc/wireguard /var/lib/boxion
+# Création répertoires critiques avec vérification
+echo "📁 Création répertoires système..."
+if ! mkdir -p /etc/wireguard /var/lib/boxion 2>/dev/null; then
+    echo "❌ Erreur création répertoires système"
+    echo "💡 Vérifiez les permissions root"
+    exit 1
+fi
 chmod 700 /etc/wireguard
 
 # ====== Validation IPv6 PREFIX ======
@@ -274,7 +295,7 @@ CREATE TABLE IF NOT EXISTS meta (
 );
 INSERT OR IGNORE INTO meta(k,v) VALUES('last_id','1');
 EOF
-sqlite3 /var/lib/boxion/boxion.db < ${APP}/sql/init.sql
+sqlite3 /var/lib/boxion/boxion.db < ${APP}/sql/init.sql >/dev/null
 chown www-data:www-data /var/lib/boxion/boxion.db
 
 # -------- .env --------
@@ -779,7 +800,28 @@ EOF
 install -m644 ${APP}/nginx/boxion-api.conf /etc/nginx/sites-available/boxion-api.conf
 ln -sf /etc/nginx/sites-available/boxion-api.conf /etc/nginx/sites-enabled/boxion-api.conf
 rm -f /etc/nginx/sites-enabled/default
-systemctl reload nginx
+
+# Test configuration nginx avant reload (critique)
+echo "🔍 Test configuration nginx..."
+if ! nginx -t 2>/dev/null; then
+    echo "❌ Configuration nginx invalide, diagnostic:"
+    nginx -t
+    echo "💡 Vérifiez les permissions et la syntaxe"
+    exit 1
+fi
+
+# Reload sécurisé avec fallback
+echo "🔄 Rechargement nginx..."
+if ! systemctl reload nginx 2>/dev/null; then
+    echo "⚠️  Reload nginx échoué, tentative restart..."
+    if ! systemctl restart nginx; then
+        echo "❌ Nginx service failed - voir logs:"
+        journalctl -xeu nginx.service --no-pager -l | tail -20
+        echo "💡 Diagnostic manuel: systemctl status nginx.service"
+        exit 1
+    fi
+fi
+
 systemctl restart php*-fpm.service || true
 
 # -------- Génération credentials admin --------
@@ -791,16 +833,27 @@ ADMIN_PASS="${ADMIN_PASSWORD}"
 COMPANY="${COMPANY_NAME:-Gasser IT Services}"
 LEGAL_PAGES="${INCLUDE_LEGAL:-false}"
 
-# Génération sécurisée des credentials
-php -r "
+# Génération sécurisée des credentials avec gestion d'erreur
+echo "🔐 Génération des identifiants admin..."
+if ! php -r "
 require_once '${APP}/web/admin/auth.php';
 \$username = '$ADMIN_USER';
 \$password = '$ADMIN_PASS' ?: null;
 \$creds = BoxionAuth::createCredentials(\$username, \$password);
 echo 'Admin créé: ' . \$creds['username'] . ' / ' . \$creds['password'] . "\n";
 file_put_contents('/tmp/boxion_admin_creds.txt', 'Username: ' . \$creds['username'] . "\nPassword: " . \$creds['password'] . "\n");
-"
-ADMIN_CREDS=$(cat /tmp/boxion_admin_creds.txt)
+" 2>/dev/null; then
+    echo "❌ Erreur génération credentials admin"
+    echo "💡 Vérifiez: ${APP}/web/admin/auth.php"
+    exit 1
+fi
+
+if [[ ! -f /tmp/boxion_admin_creds.txt ]]; then
+    echo "❌ Fichier credentials non généré"
+    exit 1
+fi
+
+ADMIN_CREDS=$(cat /tmp/boxion_admin_creds.txt 2>/dev/null || echo "Erreur lecture credentials")
 rm -f /tmp/boxion_admin_creds.txt
 
 # -------- Personnalisation Dashboard --------

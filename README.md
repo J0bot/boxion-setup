@@ -199,8 +199,8 @@ curl -fsSL https://raw.githubusercontent.com/J0bot/boxion-setup/main/diagnostic_
 
 ### ⚡ **Installation VPS** - 2 modes disponibles
 
-#### 🤖 **Mode 1 : Installation Automatique (Recommandé)**
-*Utilise des valeurs par défaut intelligentes - parfait pour débuter !*
+#### 🤖 **Mode 1 : Installation Automatique (Rapide)**
+*Utilise des valeurs par défaut intelligentes - parfait pour le VPS tunnel.milkywayhub.org !*
 
 ```bash
 # Installation automatique complète (OBLIGATOIRE: sudo/root)

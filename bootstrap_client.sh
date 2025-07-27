@@ -80,7 +80,10 @@ chmod 600 "$WG_DIR/$WG_IF.conf"
 # ====== Démarrage WireGuard ======
 echo "🚀 Démarrage de WireGuard..."
 systemctl enable wg-quick@$WG_IF 2>/dev/null || true
-systemctl restart wg-quick@$WG_IF
+if ! systemctl restart wg-quick@$WG_IF 2>/dev/null; then
+    echo "⚠️  Erreur restart WireGuard, diagnostic..."
+    systemctl status wg-quick@$WG_IF --no-pager || true
+fi
 
 # ====== Vérification ======
 sleep 2

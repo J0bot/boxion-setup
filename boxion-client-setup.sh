@@ -56,6 +56,27 @@ conf=$(echo "$resp" | jq -r '.wg_conf')
 printf "[Interface]\nPrivateKey = %s\n%s" "$PRIV" "$(echo "$conf" | sed '1d')" > "$WG_DIR/$WG_IF.conf"
 chmod 600 "$WG_DIR/$WG_IF.conf"
 
-systemctl enable wg-quick@$WG_IF
-systemctl restart wg-quick@$WG_IF
+# Activation service WireGuard avec gestion d'erreur
+echo "🚀 Activation WireGuard..."
+if ! systemctl enable wg-quick@$WG_IF 2>/dev/null; then
+    echo "❌ Erreur activation service WireGuard"
+    echo "💡 Vérifiez les permissions sudo"
+    exit 1
+fi
+
+if ! systemctl restart wg-quick@$WG_IF 2>/dev/null; then
+    echo "❌ Erreur démarrage WireGuard"
+    echo "💡 Vérifiez la configuration: $WG_DIR/$WG_IF.conf"
+    systemctl status wg-quick@$WG_IF --no-pager || true
+    exit 1
+fi
+
+# Vérification finale interface active
+if ! wg show $WG_IF >/dev/null 2>&1; then
+    echo "❌ Interface WireGuard inactive"
+    echo "💡 Diagnostic: sudo wg show $WG_IF"
+    exit 1
+fi
+
+echo "✅ WireGuard connecté avec succès !"
 echo "UP ✓  $(wg show $WG_IF | sed -n '1,12p')"
