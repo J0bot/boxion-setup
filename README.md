@@ -94,8 +94,7 @@ Pour obtenir votre token d'accès gratuit au service `tunnel.milkywayhub.org` :
 
 1. 📨 **Email** : `tunnel@milkywayhub.org`
 2. 📱 **Sujet** : "Demande token Boxion"
-3. 📋 **Infos à fournir** :
-   - Pseudo souhaité uniquement
+3. 📋 **Infos à fournir** : Pseudo souhaité uniquement
 
 > 🚀 **Objectif** : Une plateforme automatisée sera développée pour générer les tokens instantanément sans intervention manuelle.
 

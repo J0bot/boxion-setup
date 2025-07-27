@@ -19,6 +19,9 @@ fi
 DOMAIN="${DOMAIN:-}"
 EMAIL="${EMAIL:-}"
 INCLUDE_LEGAL="${INCLUDE_LEGAL:-}"
+COMPANY_NAME="${COMPANY_NAME:-}"
+ADMIN_USERNAME="${ADMIN_USERNAME:-}"
+ADMIN_PASSWORD="${ADMIN_PASSWORD:-}"
 
 # ====== Détection/Demande des paramètres ======
 echo "🌐 Configuration du domaine pour l'API Boxion"
@@ -151,13 +154,17 @@ else
 fi
 
 # Auto-détection du préfixe IPv6 /64
+# Récupération de l'IPv6 globale sur l'interface WAN
+V6=$(ip -6 addr show dev "$WAN_IF" scope global 2>/dev/null | awk '/inet6/ && !/temporary/ {print $2; exit}' | cut -d/ -f1)
+
 if [[ -n "$V6" ]]; then
   PREFIX=$(printf "%s:%s:%s:%s" $(echo "$V6" | awk -F: '{print $1,$2,$3,$4}'))
   echo "🌐 Préfixe IPv6 détecté: ${PREFIX}::/64"
 else
   echo "⚠️  Aucune IPv6 globale détectée sur $WAN_IF"
-  read -p "🌐 Entrez votre préfixe IPv6 /64 (ex: 2a0c:xxxx:xxxx:abcd): " PREFIX_INPUT
-  PREFIX="${PREFIX_INPUT:-2a0c:xxxx:xxxx:abcd}"
+  echo "🌐 Utilisation du préfixe par défaut (mode non-interactif)"
+  PREFIX="2a0c:xxxx:xxxx:abcd"
+  echo "🌐 Préfixe IPv6 par défaut: ${PREFIX}::/64"
 fi
 
 # ====== Génération token sécurisé ======
