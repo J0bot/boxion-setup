@@ -108,6 +108,7 @@ if ! mkdir -p /etc/wireguard /var/lib/boxion 2>/dev/null; then
     exit 1
 fi
 chmod 700 /etc/wireguard
+chmod 755 /var/lib/boxion  # Permissions pour PHP
 
 # ====== Validation IPv6 PREFIX ======
 if [[ ! "$IPV6_PREFIX" =~ ^[0-9a-fA-F:]+$ ]] || [[ ${#IPV6_PREFIX} -lt 3 ]]; then
@@ -858,10 +859,31 @@ try {
 ?>
 PHPEOF
 
+# Test PHP basique d'abord
+echo "🔍 Test PHP basique..."
+if ! php -r "echo 'PHP OK';" 2>/dev/null; then
+    echo "❌ PHP non fonctionnel sur ce système"
+    php -v
+    exit 1
+fi
+
+# Test accès répertoire
+echo "🔍 Test accès /var/lib/boxion..."
+if [[ ! -d /var/lib/boxion ]]; then
+    echo "❌ Répertoire /var/lib/boxion inexistant"
+    exit 1
+fi
+if [[ ! -w /var/lib/boxion ]]; then
+    echo "❌ Répertoire /var/lib/boxion non writable"
+    ls -la /var/lib/ | grep boxion
+    exit 1
+fi
+
 # Exécution sécurisée avec variables d'environnement
 export BOXION_APP="${APP}"
 export BOXION_ADMIN_USER="${ADMIN_USER}"
 export BOXION_ADMIN_PASS="${ADMIN_PASS}"
+echo "🔍 Test génération credentials..."
 if ! php /tmp/boxion_gen_creds.php 2>/tmp/boxion_php_error.log; then
     echo "❌ Erreur génération credentials admin"
     echo "💡 Logs PHP: /tmp/boxion_php_error.log"
