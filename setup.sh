@@ -796,6 +796,7 @@ server {
     # Sécurité
     location ~ /\.ht { deny all; }
     location ~ /admin_credentials\.json { deny all; }
+}
 EOF
 install -m644 ${APP}/nginx/boxion-api.conf /etc/nginx/sites-available/boxion-api.conf
 ln -sf /etc/nginx/sites-available/boxion-api.conf /etc/nginx/sites-enabled/boxion-api.conf
