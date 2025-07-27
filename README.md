@@ -197,14 +197,36 @@ curl -fsSL https://raw.githubusercontent.com/J0bot/boxion-setup/main/diagnostic_
 - **Ports :** `UDP/51820`, `TCP/80`, `TCP/443` ouverts dans le firewall
 - **Domaine :** (Optionnel) Pointé vers l'IP du serveur
 
-### ⚡ **Installation VPS Ultra-Rapide**
+### ⚡ **Installation VPS** - 2 modes disponibles
+
+#### 🤖 **Mode 1 : Installation Automatique (Recommandé)**
+*Utilise des valeurs par défaut intelligentes - parfait pour débuter !*
 
 ```bash
 # Installation automatique complète (OBLIGATOIRE: sudo/root)
 curl -fsSL https://raw.githubusercontent.com/J0bot/boxion-setup/main/bootstrap.sh | sudo bash
 ```
 
-**🎨 Le script configure automatiquement :**
+**🎨 Configuration automatique :**
+- 🌐 **Domaine :** `tunnel.milkywayhub.org`
+- 📧 **Email :** `admin@tunnel.milkywayhub.org`  
+- 🏢 **Entreprise :** `Gasser IT Services`
+- 👤 **Admin :** `admin` + mot de passe généré
+- ⚖️ **Pages légales :** Désactivées
+
+#### 🎯 **Mode 2 : Installation Interactive (Personnalisée)**
+*Choisissez vos paramètres : domaine, email, entreprise, admin...*
+
+```bash
+# Téléchargement du script
+wget https://raw.githubusercontent.com/J0bot/boxion-setup/main/bootstrap.sh
+chmod +x bootstrap.sh
+
+# Lancement interactif (vous pourrez tout personnaliser)
+sudo ./bootstrap.sh
+```
+
+**🎨 Le script installe automatiquement :**
 - ✅ Toutes les dépendances Debian 12
 - ✅ WireGuard + Nginx + PHP-FPM + SQLite
 - ✅ Certificats TLS Let's Encrypt

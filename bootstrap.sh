@@ -23,16 +23,27 @@ COMPANY_NAME="${COMPANY_NAME:-}"
 ADMIN_USERNAME="${ADMIN_USERNAME:-}"
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-}"
 
-# ====== Détection/Demande des paramètres ======
-echo "🌐 Configuration du domaine pour l'API Boxion"
-echo "Options disponibles:"
-echo "  1. Votre propre domaine (ex: vpn.mondomaine.com)"
-echo "  2. Adresse IP publique de ce serveur (pour tests)"
-echo "  3. Domaine par défaut (tunnel.milkywayhub.org)"
-echo
+# ====== Détection du mode d'exécution ======
+INTERACTIVE_MODE=false
+if [[ -t 0 ]] && [[ "${FORCE_NON_INTERACTIVE:-}" != "true" ]]; then
+    INTERACTIVE_MODE=true
+    echo "🎛️  Mode interactif détecté"
+else
+    echo "🤖 Mode non-interactif (curl | bash)"
+fi
 
-# Auto-détection du domaine (non-interactif pour curl)
-if [[ -z "$DOMAIN" ]]; then
+# ====== Configuration du domaine ======
+echo "🌐 Configuration du domaine pour l'API Boxion"
+if [[ "$INTERACTIVE_MODE" == "true" ]] && [[ -z "$DOMAIN" ]]; then
+    echo "Options disponibles:"
+    echo "  1. Votre propre domaine (ex: vpn.mondomaine.com)"
+    echo "  2. Adresse IP publique de ce serveur (pour tests)" 
+    echo "  3. Domaine par défaut (tunnel.milkywayhub.org)"
+    echo
+    read -p "🌐 Nom de domaine ou IP [tunnel.milkywayhub.org]: " DOMAIN_INPUT
+    DOMAIN="${DOMAIN_INPUT:-tunnel.milkywayhub.org}"
+    echo "🌐 Domaine sélectionné: $DOMAIN"
+elif [[ -z "$DOMAIN" ]]; then
     DOMAIN="tunnel.milkywayhub.org"
     echo "🌐 Domaine par défaut utilisé: $DOMAIN"
 else
@@ -55,8 +66,12 @@ else
 fi
 echo
 
-# Auto-configuration email (non-interactif)
-if [[ -z "$EMAIL" ]]; then
+# Configuration email
+if [[ "$INTERACTIVE_MODE" == "true" ]] && [[ -z "$EMAIL" ]]; then
+    read -p "📧 Email pour Let's Encrypt [admin@${DOMAIN}]: " EMAIL_INPUT
+    EMAIL="${EMAIL_INPUT:-admin@${DOMAIN}}"
+    echo "📧 Email configuré: $EMAIL"
+elif [[ -z "$EMAIL" ]]; then
     EMAIL="admin@${DOMAIN}"
     echo "📧 Email par défaut utilisé: $EMAIL"
 else
@@ -65,31 +80,56 @@ fi
 
 echo
 echo "🏢 === PERSONNALISATION DASHBOARD ==="
-# Configuration dashboard (non-interactif)
-if [[ -z "$COMPANY_NAME" ]]; then
+# Configuration dashboard
+if [[ "$INTERACTIVE_MODE" == "true" ]] && [[ -z "$COMPANY_NAME" ]]; then
+    read -p "🏢 Nom de votre entreprise [Gasser IT Services]: " COMPANY_INPUT
+    COMPANY_NAME="${COMPANY_INPUT:-Gasser IT Services}"
+elif [[ -z "$COMPANY_NAME" ]]; then
     COMPANY_NAME="Gasser IT Services"
 fi
 echo "🏢 Entreprise configurée: $COMPANY_NAME"
 
-# Pages légales (non-interactif)
-if [[ -z "$INCLUDE_LEGAL" ]]; then
+# Pages légales
+if [[ "$INTERACTIVE_MODE" == "true" ]] && [[ -z "$INCLUDE_LEGAL" ]]; then
+    read -p "⚖️  Inclure les pages légales (confidentialité, mentions) ? [o/N]: " LEGAL_INPUT
+    INCLUDE_LEGAL="${LEGAL_INPUT:-n}"
+    if [[ "$INCLUDE_LEGAL" =~ ^[Oo]([Uu][Ii])?$ ]]; then
+        INCLUDE_LEGAL="true"
+    else
+        INCLUDE_LEGAL="false"
+    fi
+elif [[ -z "$INCLUDE_LEGAL" ]]; then
     INCLUDE_LEGAL="false"
 fi
 echo "⚖️  Pages légales: $INCLUDE_LEGAL"
 
 echo
 echo "🔐 === CREDENTIALS ADMIN ==="
-# Configuration admin (non-interactif)
-if [[ -z "$ADMIN_USERNAME" ]]; then
+# Configuration admin
+if [[ "$INTERACTIVE_MODE" == "true" ]] && [[ -z "$ADMIN_USERNAME" ]]; then
+    read -p "👤 Nom d'utilisateur admin [admin]: " ADMIN_USER_INPUT
+    ADMIN_USERNAME="${ADMIN_USER_INPUT:-admin}"
+elif [[ -z "$ADMIN_USERNAME" ]]; then
     ADMIN_USERNAME="admin"
 fi
 echo "👤 Utilisateur admin: $ADMIN_USERNAME"
 
-# Mot de passe admin (génération automatique)
-if [[ -z "$ADMIN_PASSWORD" ]]; then
+# Mot de passe admin
+if [[ "$INTERACTIVE_MODE" == "true" ]] && [[ -z "$ADMIN_PASSWORD" ]]; then
+    read -p "🔑 Mot de passe admin (laissez vide pour génération automatique): " ADMIN_PASS_INPUT
+    if [[ -n "$ADMIN_PASS_INPUT" ]]; then
+        ADMIN_PASSWORD="$ADMIN_PASS_INPUT"
+        echo "🔑 Mot de passe admin: [personnalisé]"
+    else
+        ADMIN_PASSWORD=""
+        echo "🔑 Mot de passe admin: [génération automatique]"
+    fi
+elif [[ -z "$ADMIN_PASSWORD" ]]; then
     ADMIN_PASSWORD=""
+    echo "🔑 Mot de passe admin: [génération automatique]"
+else
+    echo "🔑 Mot de passe admin: [configuré]"
 fi
-echo "🔑 Mot de passe admin: [génération automatique]"
 
 echo "🔍 Auto-détection des paramètres réseau..."
 

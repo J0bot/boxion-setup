@@ -205,7 +205,8 @@ EOF
         exit 1
     fi
     
-    if [[ $(ip link show ${WG_IF} | grep -c "state UP") -eq 0 ]]; then
+    # Vérification interface WireGuard (UP,LOWER_UP est normal, pas state UP)
+    if ! ip link show ${WG_IF} | grep -q "UP,LOWER_UP"; then
         echo "❌ Erreur: Interface WireGuard ${WG_IF} inactive" >&2
         ip link show ${WG_IF} >&2 || true
         exit 1
