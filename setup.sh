@@ -405,7 +405,13 @@ chown -R www-data:www-data ${APP}/api
 
 # -------- Dashboard Web --------
 echo "🌐 Installation du dashboard web..."
-mkdir -p ${APP}/web/admin
+# Création des répertoires web critiques
+if ! mkdir -p ${APP}/web/admin 2>/dev/null; then
+    echo "❌ Erreur création répertoire web admin"
+    echo "💡 Vérifiez les permissions: ${APP}/web/"
+    exit 1
+fi
+echo "✅ Répertoires web créés: ${APP}/web/admin"
 
 # Page d'accueil publique
 cat >${APP}/web/index.php <<'WEBEOF'
@@ -835,7 +841,6 @@ COMPANY="${COMPANY_NAME:-Gasser IT Services}"
 LEGAL_PAGES="${INCLUDE_LEGAL:-false}"
 
 # Génération sécurisée des credentials avec gestion d'erreur
-echo "🔐 Génération des identifiants admin..."
 if ! php -r "
 require_once '${APP}/web/admin/auth.php';
 \$username = '$ADMIN_USER';
