@@ -18,6 +18,7 @@ fi
 # ====== Initialisation des variables ======
 DOMAIN="${DOMAIN:-}"
 EMAIL="${EMAIL:-}"
+INCLUDE_LEGAL="${INCLUDE_LEGAL:-}"
 
 # ====== Détection/Demande des paramètres ======
 echo "🌐 Configuration du domaine pour l'API Boxion"
