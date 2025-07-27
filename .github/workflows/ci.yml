@@ -1,0 +1,155 @@
+name: 🧪 Boxion CI Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    name: 🔍 Quality Checks
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+      
+    - name: 🐚 Install ShellCheck
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y shellcheck
+        
+    - name: 🐘 Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.1'
+        extensions: sqlite3, pdo_sqlite
+        
+    - name: 🔍 ShellCheck - Scripts validation
+      run: |
+        echo "🧪 Testing shell scripts..."
+        find . -name "*.sh" -type f | while read -r script; do
+          echo "📝 Checking: $script"
+          shellcheck "$script" || exit 1
+        done
+        echo "✅ All shell scripts passed!"
+        
+    - name: 🐘 PHP Lint - API validation  
+      run: |
+        echo "🧪 Testing PHP files..."
+        find . -name "*.php" -type f | while read -r phpfile; do
+          echo "📝 Checking: $phpfile"
+          php -l "$phpfile" || exit 1
+        done
+        echo "✅ All PHP files passed!"
+        
+    - name: 📁 File permissions check
+      run: |
+        echo "🧪 Checking executable permissions..."
+        
+        # Scripts that should be executable
+        EXECUTABLES=(
+          "bootstrap.sh"
+          "bootstrap_client.sh" 
+          "setup.sh"
+          "boxion-client-setup.sh"
+          "diagnostic.sh"
+          "diagnostic_client.sh"
+          "uninstall.sh"
+          "uninstall_client.sh"
+          "bin/wg_add_peer.sh"
+          "bin/wg_del_peer.sh"
+          "bin/replay_ndp.sh"
+        )
+        
+        for script in "${EXECUTABLES[@]}"; do
+          if [[ -f "$script" ]]; then
+            echo "📝 Checking executable: $script"
+            if [[ ! -x "$script" ]]; then
+              echo "❌ Error: $script is not executable!"
+              exit 1
+            fi
+          else
+            echo "⚠️  Warning: $script not found"
+          fi
+        done
+        echo "✅ All executables have correct permissions!"
+        
+    - name: 🏗️ Project structure validation
+      run: |
+        echo "🧪 Validating project structure..."
+        
+        REQUIRED_DIRS=(
+          "api"
+          "bin" 
+          "sql"
+          "nginx"
+          "sudoers"
+          "systemd"
+          "web"
+          "web/admin"
+        )
+        
+        REQUIRED_FILES=(
+          "README.md"
+          ".env.example"
+          "api/index.php"
+          "sql/init.sql"
+          "nginx/boxion-api.conf"
+          "sudoers/boxion-api"
+          "systemd/boxion-replay-ndp.service"
+        )
+        
+        # Check directories
+        for dir in "${REQUIRED_DIRS[@]}"; do
+          if [[ ! -d "$dir" ]]; then
+            echo "❌ Missing directory: $dir"
+            exit 1
+          fi
+        done
+        
+        # Check files  
+        for file in "${REQUIRED_FILES[@]}"; do
+          if [[ ! -f "$file" ]]; then
+            echo "❌ Missing file: $file"
+            exit 1
+          fi
+        done
+        
+        echo "✅ Project structure is valid!"
+        
+    - name: 📋 Security check - No secrets exposed
+      run: |
+        echo "🧪 Checking for exposed secrets..."
+        
+        # Check for potential secrets
+        if grep -r "BEGIN.*PRIVATE.*KEY" . --exclude-dir=.git; then
+          echo "❌ Private key found in repository!"
+          exit 1
+        fi
+        
+        if grep -r -E "[0-9a-f]{32,}" . --exclude-dir=.git --exclude="*.yml" --exclude="README.md"; then
+          echo "⚠️  Potential token/hash found - manual review needed"
+        fi
+        
+        # Verify only placeholder tokens exist
+        if grep -r "PLACE_YOUR_TOKEN\|change-me" . --exclude-dir=.git > /dev/null; then
+          echo "✅ Only placeholder tokens found - good!"
+        else
+          echo "⚠️  No placeholder tokens found - verify manually"
+        fi
+        
+        echo "✅ Security check completed!"
+
+    - name: 📊 Final summary
+      run: |
+        echo ""
+        echo "🎉 === BOXION CI TESTS SUMMARY ==="
+        echo "✅ Shell scripts: Passed"
+        echo "✅ PHP files: Passed" 
+        echo "✅ Permissions: Passed"
+        echo "✅ Structure: Passed"
+        echo "✅ Security: Passed"
+        echo ""
+        echo "🚀 Ready for deployment!"

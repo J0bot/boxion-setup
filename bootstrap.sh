@@ -49,6 +49,31 @@ echo
 read -p "📧 Email pour Let's Encrypt [admin@${DOMAIN}]: " EMAIL_INPUT
 EMAIL="${EMAIL_INPUT:-admin@${DOMAIN}}"
 
+echo
+echo "🏢 === PERSONNALISATION DASHBOARD ==="
+read -p "🏢 Nom de votre entreprise [Gasser IT Services]: " COMPANY_INPUT
+COMPANY_NAME="${COMPANY_INPUT:-Gasser IT Services}"
+
+read -p "⚖️  Inclure les pages légales (confidentialité, mentions) ? [o/N]: " LEGAL_INPUT
+INCLUDE_LEGAL="${LEGAL_INPUT:-n}"
+if [[ "$INCLUDE_LEGAL" =~ ^[Oo]([Uu][Ii])?$ ]]; then
+    INCLUDE_LEGAL="true"
+else
+    INCLUDE_LEGAL="false"
+fi
+
+echo
+echo "🔐 === CREDENTIALS ADMIN ==="
+read -p "👤 Nom d'utilisateur admin [admin]: " ADMIN_USER_INPUT
+ADMIN_USERNAME="${ADMIN_USER_INPUT:-admin}"
+
+read -p "🔑 Mot de passe admin (laissez vide pour génération automatique): " ADMIN_PASS_INPUT
+if [[ -n "$ADMIN_PASS_INPUT" ]]; then
+    ADMIN_PASSWORD="$ADMIN_PASS_INPUT"
+else
+    ADMIN_PASSWORD=""
+fi
+
 echo "🔍 Auto-détection des paramètres réseau..."
 
 # ====== Sélection interface réseau ======
@@ -147,6 +172,13 @@ fi
 # ====== Installation serveur ======
 echo "⚙️  Installation du serveur Boxion..."
 chmod +x setup.sh
+
+# Export des variables de personnalisation pour setup.sh
+export COMPANY_NAME="$COMPANY_NAME"
+export INCLUDE_LEGAL="$INCLUDE_LEGAL"
+export ADMIN_USERNAME="$ADMIN_USERNAME"
+export ADMIN_PASSWORD="$ADMIN_PASSWORD"
+
 ./setup.sh --domain "$DOMAIN" --token "$TOKEN" --prefix "$PREFIX" --port 51820 --wan-if "$WAN_IF"
 
 # ====== Configuration TLS ======
