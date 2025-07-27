@@ -841,18 +841,40 @@ COMPANY="${COMPANY_NAME:-Gasser IT Services}"
 LEGAL_PAGES="${INCLUDE_LEGAL:-false}"
 
 # Génération sécurisée des credentials avec gestion d'erreur
-if ! php -r "
-require_once '${APP}/web/admin/auth.php';
-\$username = '$ADMIN_USER';
-\$password = '$ADMIN_PASS' ?: null;
-\$creds = BoxionAuth::createCredentials(\$username, \$password);
-echo 'Admin créé: ' . \$creds['username'] . ' / ' . \$creds['password'] . "\n";
-file_put_contents('/tmp/boxion_admin_creds.txt', 'Username: ' . \$creds['username'] . "\nPassword: " . \$creds['password'] . "\n");
-" 2>/dev/null; then
+# Création script PHP temporaire sécurisé
+cat > /tmp/boxion_gen_creds.php << 'PHPEOF'
+<?php
+require_once getenv('BOXION_APP') . '/web/admin/auth.php';
+$username = getenv('BOXION_ADMIN_USER') ?: 'admin';
+$password = getenv('BOXION_ADMIN_PASS') ?: null;
+try {
+    $creds = BoxionAuth::createCredentials($username, $password);
+    echo 'Admin créé: ' . $creds['username'] . ' / ' . $creds['password'] . "\n";
+    file_put_contents('/tmp/boxion_admin_creds.txt', 'Username: ' . $creds['username'] . "\nPassword: " . $creds['password'] . "\n");
+} catch (Exception $e) {
+    error_log('Boxion credentials error: ' . $e->getMessage());
+    exit(1);
+}
+?>
+PHPEOF
+
+# Exécution sécurisée avec variables d'environnement
+export BOXION_APP="${APP}"
+export BOXION_ADMIN_USER="${ADMIN_USER}"
+export BOXION_ADMIN_PASS="${ADMIN_PASS}"
+if ! php /tmp/boxion_gen_creds.php 2>/tmp/boxion_php_error.log; then
     echo "❌ Erreur génération credentials admin"
+    echo "💡 Logs PHP: /tmp/boxion_php_error.log"
     echo "💡 Vérifiez: ${APP}/web/admin/auth.php"
+    if [[ -f /tmp/boxion_php_error.log && -s /tmp/boxion_php_error.log ]]; then
+        echo "🐛 Erreur PHP détectée:"
+        head -3 /tmp/boxion_php_error.log
+    fi
     exit 1
 fi
+
+# Nettoyage fichiers temporaires
+rm -f /tmp/boxion_gen_creds.php /tmp/boxion_php_error.log
 
 if [[ ! -f /tmp/boxion_admin_creds.txt ]]; then
     echo "❌ Fichier credentials non généré"
