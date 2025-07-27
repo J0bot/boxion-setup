@@ -336,7 +336,7 @@ main() {
     log_info "MAIN" "Phase d'installation"
     
     if [[ "${MODULES_TO_INSTALL[0]}" == "all" ]]; then
-        MODULES_TO_INSTALL=("system" "wireguard" "api" "dashboard")
+        MODULES_TO_INSTALL=("system" "wireguard" "api" "web" "security")
     fi
     
     local total_modules=${#MODULES_TO_INSTALL[@]}
