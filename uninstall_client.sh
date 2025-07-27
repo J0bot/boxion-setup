@@ -28,12 +28,9 @@ echo "   • Clés privées/publiques"
 echo "   • Scripts de connexion"
 echo "   • Services systemd (Linux)"
 echo
-read -p "❓ Confirmez la désinstallation complète [y/N]: " CONFIRM
-
-if [[ "$CONFIRM" != "y" && "$CONFIRM" != "Y" ]]; then
-    echo "❌ Désinstallation annulée"
-    exit 0
-fi
+# Mode non-interactif : désinstallation automatique
+echo "⚠️  Mode automatique : désinstallation client confirmée"
+CONFIRM="y"
 
 echo "🚀 Début de la désinstallation..."
 

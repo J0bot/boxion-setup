@@ -28,8 +28,13 @@ echo "  2. Adresse IP publique de ce serveur (pour tests)"
 echo "  3. Domaine par défaut (tunnel.milkywayhub.org)"
 echo
 
-read -p "🌐 Nom de domaine ou IP [tunnel.milkywayhub.org]: " DOMAIN_INPUT
-DOMAIN="${DOMAIN_INPUT:-tunnel.milkywayhub.org}"
+# Auto-détection du domaine (non-interactif pour curl)
+if [[ -z "$DOMAIN" ]]; then
+    DOMAIN="tunnel.milkywayhub.org"
+    echo "🌐 Domaine par défaut utilisé: $DOMAIN"
+else
+    echo "🌐 Domaine configuré: $DOMAIN"
+fi
 
 # Vérification et conseils selon le type de domaine
 if [[ "$DOMAIN" == "tunnel.milkywayhub.org" ]]; then
@@ -47,33 +52,41 @@ else
 fi
 echo
 
-read -p "📧 Email pour Let's Encrypt [admin@${DOMAIN}]: " EMAIL_INPUT
-EMAIL="${EMAIL_INPUT:-admin@${DOMAIN}}"
+# Auto-configuration email (non-interactif)
+if [[ -z "$EMAIL" ]]; then
+    EMAIL="admin@${DOMAIN}"
+    echo "📧 Email par défaut utilisé: $EMAIL"
+else
+    echo "📧 Email configuré: $EMAIL"
+fi
 
 echo
 echo "🏢 === PERSONNALISATION DASHBOARD ==="
-read -p "🏢 Nom de votre entreprise [Gasser IT Services]: " COMPANY_INPUT
-COMPANY_NAME="${COMPANY_INPUT:-Gasser IT Services}"
+# Configuration dashboard (non-interactif)
+if [[ -z "$COMPANY_NAME" ]]; then
+    COMPANY_NAME="Gasser IT Services"
+fi
+echo "🏢 Entreprise configurée: $COMPANY_NAME"
 
-read -p "⚖️  Inclure les pages légales (confidentialité, mentions) ? [o/N]: " LEGAL_INPUT
-INCLUDE_LEGAL="${LEGAL_INPUT:-n}"
-if [[ "$INCLUDE_LEGAL" =~ ^[Oo]([Uu][Ii])?$ ]]; then
-    INCLUDE_LEGAL="true"
-else
+# Pages légales (non-interactif)
+if [[ -z "$INCLUDE_LEGAL" ]]; then
     INCLUDE_LEGAL="false"
 fi
+echo "⚖️  Pages légales: $INCLUDE_LEGAL"
 
 echo
 echo "🔐 === CREDENTIALS ADMIN ==="
-read -p "👤 Nom d'utilisateur admin [admin]: " ADMIN_USER_INPUT
-ADMIN_USERNAME="${ADMIN_USER_INPUT:-admin}"
+# Configuration admin (non-interactif)
+if [[ -z "$ADMIN_USERNAME" ]]; then
+    ADMIN_USERNAME="admin"
+fi
+echo "👤 Utilisateur admin: $ADMIN_USERNAME"
 
-read -p "🔑 Mot de passe admin (laissez vide pour génération automatique): " ADMIN_PASS_INPUT
-if [[ -n "$ADMIN_PASS_INPUT" ]]; then
-    ADMIN_PASSWORD="$ADMIN_PASS_INPUT"
-else
+# Mot de passe admin (génération automatique)
+if [[ -z "$ADMIN_PASSWORD" ]]; then
     ADMIN_PASSWORD=""
 fi
+echo "🔑 Mot de passe admin: [génération automatique]"
 
 echo "🔍 Auto-détection des paramètres réseau..."
 
@@ -100,10 +113,9 @@ while IFS= read -r line; do
 done < <(ip link show)
 
 echo
-echo "  0) Auto-détection (recommandé)"
-echo
-read -p "📡 Choisissez l'interface WAN [0]: " IFACE_CHOICE
-IFACE_CHOICE="${IFACE_CHOICE:-0}"
+# Auto-sélection de l'interface (non-interactif)
+IFACE_CHOICE="0"
+echo "📡 Auto-détection activée (mode non-interactif)"
 
 # Traitement du choix
 if [[ "$IFACE_CHOICE" == "0" ]] || [[ -z "$IFACE_CHOICE" ]]; then

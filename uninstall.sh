@@ -25,12 +25,9 @@ echo "   • Clés serveur"
 echo "   • Application PHP"
 echo "   • Services systemd"
 echo
-read -p "❓ Confirmez la désinstallation complète [y/N]: " CONFIRM
-
-if [[ "$CONFIRM" != "y" && "$CONFIRM" != "Y" ]]; then
-    echo "❌ Désinstallation annulée"
-    exit 0
-fi
+# Mode non-interactif : désinstallation automatique
+echo "⚠️  Mode automatique : désinstallation confirmée"
+CONFIRM="y"
 
 echo "🚀 Début de la désinstallation..."
 
@@ -70,7 +67,9 @@ rm -rf /etc/sudoers.d/boxion-api
 
 # ====== Suppression certificats TLS (optionnel) ======
 echo "🔒 Suppression certificats TLS..."
-read -p "❓ Supprimer aussi les certificats Let's Encrypt ? [y/N]: " TLS_CONFIRM
+# Mode non-interactif : suppression automatique des certificats
+echo "🔒 Suppression automatique des certificats Let's Encrypt"
+TLS_CONFIRM="y"
 if [[ "$TLS_CONFIRM" == "y" || "$TLS_CONFIRM" == "Y" ]]; then
     # Recherche des certificats Boxion
     DOMAINS=$(certbot certificates 2>/dev/null | grep -E "(tunnel\.milkywayhub\.org|boxion)" | awk '{print $1}' || true)
@@ -95,7 +94,9 @@ ufw delete allow 51820/udp 2>/dev/null || true
 
 # ====== Suppression repository (optionnel) ======
 echo "📦 Suppression repository source..."
-read -p "❓ Supprimer aussi le repository source (/root/boxion-api) ? [y/N]: " REPO_CONFIRM
+# Mode non-interactif : suppression automatique du repository
+echo "📁 Suppression automatique du repository source"
+REPO_CONFIRM="y"
 if [[ "$REPO_CONFIRM" == "y" || "$REPO_CONFIRM" == "Y" ]]; then
     rm -rf /root/boxion-api
 fi
