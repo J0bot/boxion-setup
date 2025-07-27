@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "🚀 Boxion VPN Server Setup"
+echo "🚀 Tunnel VPN Server Setup"
 echo "========================="
 
 # ====== paramètres (flags ou interactif) ======
@@ -418,7 +418,7 @@ echo "✅ Répertoires web créés: ${APP}/web/admin"
 cat >${APP}/web/index.php <<'WEBEOF'
 <?php
 /**
- * Boxion VPN Dashboard - Page d'accueil publique
+ * Tunnel VPN Dashboard - Page d'accueil publique
  */
 ini_set('display_errors', 0);
 error_reporting(0);
@@ -432,7 +432,7 @@ header('Referrer-Policy: strict-origin-when-cross-origin');
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Boxion VPN System</title>
+    <title>Tunnel VPN System</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
@@ -480,8 +480,8 @@ header('Referrer-Policy: strict-origin-when-cross-origin');
     
     <div class="header">
         <div class="container">
-            <h1>🛡️ Boxion VPN</h1>
-            <p>Système VPN WireGuard avec API de gestion automatique</p>
+            <h1>🛡️ Tunnel VPN</h1>
+            <p>Serveur tunnel WireGuard pour vos Boxions</p>
             <span class="status online">🟢 Système actif</span>
         </div>
     </div>
@@ -529,7 +529,7 @@ header('Referrer-Policy: strict-origin-when-cross-origin');
 
     <div class="footer">
         <div class="container">
-            <p>🛡️ Boxion VPN System - Sécurisé, Rapide, Open Source</p>
+            <p>🛡️ Tunnel VPN System - Sécurisé, Rapide, Open Source</p>
         </div>
     </div>
 </body>
@@ -543,7 +543,7 @@ ini_set('display_errors', 0);
 error_reporting(0);
 session_set_cookie_params([
     'lifetime' => 3600, 'path' => '/admin/', 'domain' => '',
-    'secure' => isset(\$_SERVER['HTTPS']), 'httponly' => true, 'samesite' => 'Strict'
+    'secure' => isset($_SERVER['HTTPS']), 'httponly' => true, 'samesite' => 'Strict'
 ]);
 if (session_status() === PHP_SESSION_NONE) { session_start(); }
 header('X-Content-Type-Options: nosniff');
@@ -555,76 +555,76 @@ class BoxionAuth {
     private const CREDENTIALS_FILE = '/var/lib/boxion/admin_credentials.json';
     private const SESSION_TIMEOUT = 3600;
     
-    public static function generatePassword(\$length = 16) {
-        \$chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#\$%^&*';
-        return substr(str_shuffle(str_repeat(\$chars, ceil(\$length / strlen(\$chars)))), 0, \$length);
+    public static function generatePassword($length = 16) {
+        $chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
+        return substr(str_shuffle(str_repeat($chars, ceil($length / strlen($chars)))), 0, $length);
     }
     
-    public static function createCredentials(\$username = null, \$password = null) {
-        \$username = \$username ?: 'admin';
-        \$password = \$password ?: self::generatePassword();
-        \$credentials = [
-            'username' => \$username, 'password_hash' => password_hash(\$password, PASSWORD_ARGON2ID),
+    public static function createCredentials($username = null, $password = null) {
+        $username = $username ?: 'admin';
+        $password = $password ?: self::generatePassword();
+        $credentials = [
+            'username' => $username, 'password_hash' => password_hash($password, PASSWORD_ARGON2ID),
             'created_at' => time(), 'last_login' => null
         ];
-        \$dir = dirname(self::CREDENTIALS_FILE);
-        if (!is_dir(\$dir)) { mkdir(\$dir, 0750, true); }
-        file_put_contents(self::CREDENTIALS_FILE, json_encode(\$credentials, JSON_PRETTY_PRINT));
+        $dir = dirname(self::CREDENTIALS_FILE);
+        if (!is_dir($dir)) { mkdir($dir, 0750, true); }
+        file_put_contents(self::CREDENTIALS_FILE, json_encode($credentials, JSON_PRETTY_PRINT));
         chmod(self::CREDENTIALS_FILE, 0600);
-        return ['username' => \$username, 'password' => \$password];
+        return ['username' => $username, 'password' => $password];
     }
     
-    public static function verifyCredentials(\$username, \$password) {
+    public static function verifyCredentials($username, $password) {
         if (!file_exists(self::CREDENTIALS_FILE)) { return false; }
-        \$credentials = json_decode(file_get_contents(self::CREDENTIALS_FILE), true);
-        if (!\$credentials || \$credentials['username'] !== \$username) { return false; }
-        if (!password_verify(\$password, \$credentials['password_hash'])) { return false; }
-        \$credentials['last_login'] = time();
-        file_put_contents(self::CREDENTIALS_FILE, json_encode(\$credentials, JSON_PRETTY_PRINT));
+        $credentials = json_decode(file_get_contents(self::CREDENTIALS_FILE), true);
+        if (!$credentials || $credentials['username'] !== $username) { return false; }
+        if (!password_verify($password, $credentials['password_hash'])) { return false; }
+        $credentials['last_login'] = time();
+        file_put_contents(self::CREDENTIALS_FILE, json_encode($credentials, JSON_PRETTY_PRINT));
         return true;
     }
     
-    public static function login(\$username, \$password) {
-        if (!self::verifyCredentials(\$username, \$password)) { return false; }
+    public static function login($username, $password) {
+        if (!self::verifyCredentials($username, $password)) { return false; }
         session_regenerate_id(true);
-        \$_SESSION['authenticated'] = true; \$_SESSION['username'] = \$username;
-        \$_SESSION['login_time'] = time(); \$_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+        $_SESSION['authenticated'] = true; $_SESSION['username'] = $username;
+        $_SESSION['login_time'] = time(); $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
         return true;
     }
     
     public static function isAuthenticated() {
-        if (!isset(\$_SESSION['authenticated']) || !\$_SESSION['authenticated']) { return false; }
-        if (!isset(\$_SESSION['login_time'])) { return false; }
-        if ((time() - \$_SESSION['login_time']) > self::SESSION_TIMEOUT) {
+        if (!isset($_SESSION['authenticated']) || !$_SESSION['authenticated']) { return false; }
+        if (!isset($_SESSION['login_time'])) { return false; }
+        if ((time() - $_SESSION['login_time']) > self::SESSION_TIMEOUT) {
             self::logout(); return false;
         }
         return true;
     }
     
     public static function logout() {
-        \$_SESSION = [];
+        $_SESSION = [];
         if (ini_get("session.use_cookies")) {
-            \$params = session_get_cookie_params();
-            setcookie(session_name(), '', time() - 42000, \$params["path"], \$params["domain"], \$params["secure"], \$params["httponly"]);
+            $params = session_get_cookie_params();
+            setcookie(session_name(), '', time() - 42000, $params["path"], $params["domain"], $params["secure"], $params["httponly"]);
         }
         session_destroy();
     }
     
-    public static function getCsrfToken() { return \$_SESSION['csrf_token'] ?? ''; }
-    public static function verifyCsrfToken(\$token) { return isset(\$_SESSION['csrf_token']) && hash_equals(\$_SESSION['csrf_token'], \$token); }
+    public static function getCsrfToken() { return $_SESSION['csrf_token'] ?? ''; }
+    public static function verifyCsrfToken($token) { return isset($_SESSION['csrf_token']) && hash_equals($_SESSION['csrf_token'], $token); }
     public static function requireAuth() { if (!self::isAuthenticated()) { header('Location: login.php'); exit; } }
     
     public static function getCredentialsInfo() {
         if (!file_exists(self::CREDENTIALS_FILE)) { return null; }
-        \$credentials = json_decode(file_get_contents(self::CREDENTIALS_FILE), true);
-        if (!\$credentials) { return null; }
-        return ['username' => \$credentials['username'], 'created_at' => \$credentials['created_at'], 'last_login' => \$credentials['last_login']];
+        $credentials = json_decode(file_get_contents(self::CREDENTIALS_FILE), true);
+        if (!$credentials) { return null; }
+        return ['username' => $credentials['username'], 'created_at' => $credentials['created_at'], 'last_login' => $credentials['last_login']];
     }
 }
 
-function h(\$str) { return htmlspecialchars(\$str, ENT_QUOTES | ENT_HTML5, 'UTF-8'); }
-function isPost() { return \$_SERVER['REQUEST_METHOD'] === 'POST'; }
-function getPost(\$key, \$default = '') { return isset(\$_POST[\$key]) ? trim(\$_POST[\$key]) : \$default; }
+function h($str) { return htmlspecialchars($str, ENT_QUOTES | ENT_HTML5, 'UTF-8'); }
+function isPost() { return $_SERVER['REQUEST_METHOD'] === 'POST'; }
+function getPost($key, $default = '') { return isset($_POST[$key]) ? trim($_POST[$key]) : $default; }
 ?>
 AUTHEOF
 
@@ -632,16 +632,16 @@ AUTHEOF
 cat >${APP}/web/admin/login.php <<'LOGINEOF'
 <?php
 require_once 'auth.php';
-\$error = ''; if (BoxionAuth::isAuthenticated()) { header('Location: index.php'); exit; }
+$error = ''; if (BoxionAuth::isAuthenticated()) { header('Location: index.php'); exit; }
 if (isPost()) {
-    \$username = getPost('username'); \$password = getPost('password');
-    if (empty(\$username) || empty(\$password)) { \$error = 'Champs requis'; }
-    else if (BoxionAuth::login(\$username, \$password)) { header('Location: index.php'); exit; }
-    else { \$error = 'Identifiants incorrects'; }
+    $username = getPost('username'); $password = getPost('password');
+    if (empty($username) || empty($password)) { $error = 'Champs requis'; }
+    else if (BoxionAuth::login($username, $password)) { header('Location: index.php'); exit; }
+    else { $error = 'Identifiants incorrects'; }
 }
-\$credentialsExist = file_exists('/var/lib/boxion/admin_credentials.json');
+$credentialsExist = file_exists('/var/lib/boxion/admin_credentials.json');
 ?>
-<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Boxion Dashboard</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);min-height:100vh;display:flex;align-items:center;justify-content:center}.login-container{background:white;border-radius:12px;padding:40px;box-shadow:0 10px 30px rgba(0,0,0,0.2);width:100%;max-width:400px}.logo{text-align:center;margin-bottom:30px}.logo h1{color:#667eea;font-size:2.2em;margin-bottom:5px}.form-group{margin-bottom:20px}.form-group label{display:block;margin-bottom:5px;color:#333;font-weight:500}.form-group input{width:100%;padding:12px;border:2px solid #e1e5e9;border-radius:6px;font-size:16px}.form-group input:focus{outline:none;border-color:#667eea}.btn{width:100%;padding:12px;background:#667eea;color:white;border:none;border-radius:6px;font-size:16px;cursor:pointer}.btn:hover{background:#5a67d8}.error{background:#fed7d7;color:#c53030;padding:12px;border-radius:6px;margin-bottom:20px}.warning{background:#fef5e7;color:#d69e2e;padding:12px;border-radius:6px;margin-bottom:20px}.back-link{text-align:center;margin-top:20px}.back-link a{color:#667eea;text-decoration:none;font-size:0.9em}</style></head><body><div class="login-container"><div class="logo"><h1>🛡️ Boxion</h1><p>Dashboard Administration</p></div><?php if (!\$credentialsExist): ?><div class="warning"><strong>⚠️ Configuration manquante</strong><br>Relancez l'installation du serveur.</div><?php endif; ?><?php if (\$error): ?><div class="error"><strong>❌ Erreur:</strong> <?= h(\$error) ?></div><?php endif; ?><?php if (\$credentialsExist): ?><form method="POST"><div class="form-group"><label for="username">Nom d'utilisateur</label><input type="text" id="username" name="username" required value="<?= h(getPost('username')) ?>"></div><div class="form-group"><label for="password">Mot de passe</label><input type="password" id="password" name="password" required></div><button type="submit" class="btn">🔓 Se connecter</button></form><?php endif; ?><div class="back-link"><a href="../">← Retour à l'accueil</a></div></div></body></html>
+<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Tunnel Dashboard</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);min-height:100vh;display:flex;align-items:center;justify-content:center}.login-container{background:white;border-radius:12px;padding:40px;box-shadow:0 10px 30px rgba(0,0,0,0.2);width:100%;max-width:400px}.logo{text-align:center;margin-bottom:30px}.logo h1{color:#667eea;font-size:2.2em;margin-bottom:5px}.form-group{margin-bottom:20px}.form-group label{display:block;margin-bottom:5px;color:#333;font-weight:500}.form-group input{width:100%;padding:12px;border:2px solid #e1e5e9;border-radius:6px;font-size:16px}.form-group input:focus{outline:none;border-color:#667eea}.btn{width:100%;padding:12px;background:#667eea;color:white;border:none;border-radius:6px;font-size:16px;cursor:pointer}.btn:hover{background:#5a67d8}.error{background:#fed7d7;color:#c53030;padding:12px;border-radius:6px;margin-bottom:20px}.warning{background:#fef5e7;color:#d69e2e;padding:12px;border-radius:6px;margin-bottom:20px}.back-link{text-align:center;margin-top:20px}.back-link a{color:#667eea;text-decoration:none;font-size:0.9em}</style></head><body><div class="login-container"><div class="logo"><h1>🛡️ Tunnel</h1><p>Dashboard Administration</p></div><?php if (!$credentialsExist): ?><div class="warning"><strong>⚠️ Configuration manquante</strong><br>Relancez l'installation du serveur.</div><?php endif; ?><?php if ($error): ?><div class="error"><strong>❌ Erreur:</strong> <?= h($error) ?></div><?php endif; ?><?php if ($credentialsExist): ?><form method="POST"><div class="form-group"><label for="username">Nom d'utilisateur</label><input type="text" id="username" name="username" required value="<?= h(getPost('username')) ?>"></div><div class="form-group"><label for="password">Mot de passe</label><input type="password" id="password" name="password" required></div><button type="submit" class="btn">🔓 Se connecter</button></form><?php endif; ?><div class="back-link"><a href="../">← Retour à l'accueil</a></div></div></body></html>
 LOGINEOF
 
 # Dashboard principal (version compacte intégrée directement)
@@ -651,81 +651,81 @@ require_once 'auth.php';
 BoxionAuth::requireAuth();
 
 // Configuration
-\$envFile = '/var/www/boxion-api/.env';
-\$config = [];
-if (file_exists(\$envFile)) {
-    \$lines = file(\$envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-    foreach (\$lines as \$line) {
-        if (strpos(\$line, '=') !== false && \$line[0] !== '#') {
-            list(\$key, \$value) = explode('=', \$line, 2);
-            \$config[trim(\$key)] = trim(\$value, '"');
+$envFile = '/var/www/boxion-api/.env';
+$config = [];
+if (file_exists($envFile)) {
+    $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    foreach ($lines as $line) {
+        if (strpos($line, '=') !== false && $line[0] !== '#') {
+            list($key, $value) = explode('=', $line, 2);
+            $config[trim($key)] = trim($value, '"');
         }
     }
 }
 
 // Stats WireGuard
 function getWireGuardStats() {
-    \$stats = ['interface' => null, 'peers' => [], 'status' => 'unknown'];
-    exec('systemctl is-active wg-quick@wg0 2>/dev/null', \$output, \$return);
-    \$stats['status'] = (\$return === 0 && isset(\$output[0]) && \$output[0] === 'active') ? 'active' : 'inactive';
-    if (\$stats['status'] !== 'active') return \$stats;
+    $stats = ['interface' => null, 'peers' => [], 'status' => 'unknown'];
+    exec('systemctl is-active wg-quick@wg0 2>/dev/null', $output, $return);
+    $stats['status'] = ($return === 0 && isset($output[0]) && $output[0] === 'active') ? 'active' : 'inactive';
+    if ($stats['status'] !== 'active') return $stats;
     
-    exec('wg show wg0 2>/dev/null', \$wgOutput);
-    if (empty(\$wgOutput)) return \$stats;
+    exec('wg show wg0 2>/dev/null', $wgOutput);
+    if (empty($wgOutput)) return $stats;
     
-    \$currentPeer = null;
-    foreach (\$wgOutput as \$line) {
-        \$line = trim(\$line);
-        if (strpos(\$line, 'listening port:') === 0) {
-            \$stats['interface']['port'] = (int)substr(\$line, 16);
-        } elseif (strpos(\$line, 'peer:') === 0) {
-            \$currentPeer = ['public_key' => substr(\$line, 6), 'endpoint' => null, 'allowed_ips' => [], 'latest_handshake' => null, 'connected' => false];
-            \$stats['peers'][] = &\$currentPeer;
-        } elseif (\$currentPeer && strpos(\$line, 'endpoint:') === 0) {
-            \$currentPeer['endpoint'] = substr(\$line, 10);
-        } elseif (\$currentPeer && strpos(\$line, 'allowed ips:') === 0) {
-            \$ips = substr(\$line, 13);
-            \$currentPeer['allowed_ips'] = array_map('trim', explode(',', \$ips));
-        } elseif (\$currentPeer && strpos(\$line, 'latest handshake:') === 0) {
-            \$handshake = substr(\$line, 18);
-            \$currentPeer['latest_handshake'] = \$handshake;
-            \$currentPeer['connected'] = !in_array(\$handshake, ['(none)', '']) && strtotime(\$handshake) > (time() - 300);
+    $currentPeer = null;
+    foreach ($wgOutput as $line) {
+        $line = trim($line);
+        if (strpos($line, 'listening port:') === 0) {
+            $stats['interface']['port'] = (int)substr($line, 16);
+        } elseif (strpos($line, 'peer:') === 0) {
+            $currentPeer = ['public_key' => substr($line, 6), 'endpoint' => null, 'allowed_ips' => [], 'latest_handshake' => null, 'connected' => false];
+            $stats['peers'][] = &$currentPeer;
+        } elseif ($currentPeer && strpos($line, 'endpoint:') === 0) {
+            $currentPeer['endpoint'] = substr($line, 10);
+        } elseif ($currentPeer && strpos($line, 'allowed ips:') === 0) {
+            $ips = substr($line, 13);
+            $currentPeer['allowed_ips'] = array_map('trim', explode(',', $ips));
+        } elseif ($currentPeer && strpos($line, 'latest handshake:') === 0) {
+            $handshake = substr($line, 18);
+            $currentPeer['latest_handshake'] = $handshake;
+            $currentPeer['connected'] = !in_array($handshake, ['(none)', '']) && strtotime($handshake) > (time() - 300);
         }
     }
-    return \$stats;
+    return $stats;
 }
 
 // Peers BDD
 function getDatabasePeers() {
-    \$dbPath = '/var/lib/boxion/boxion.db';
-    if (!file_exists(\$dbPath)) return [];
+    $dbPath = '/var/lib/boxion/boxion.db';
+    if (!file_exists($dbPath)) return [];
     try {
-        \$pdo = new PDO("sqlite:\$dbPath");
-        \$stmt = \$pdo->query("SELECT name, pubkey, ipv6, created_at FROM peers ORDER BY created_at DESC");
-        return \$stmt->fetchAll(PDO::FETCH_ASSOC);
-    } catch (Exception \$e) { return []; }
+        $pdo = new PDO("sqlite:$dbPath");
+        $stmt = $pdo->query("SELECT name, pubkey, ipv6, created_at FROM peers ORDER BY created_at DESC");
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Exception $e) { return []; }
 }
 
 // Actions POST
 if (isPost()) {
-    \$action = getPost('action'); \$csrf = getPost('csrf_token');
-    if (!BoxionAuth::verifyCsrfToken(\$csrf)) { \$error = 'Token CSRF invalide'; }
+    $action = getPost('action'); $csrf = getPost('csrf_token');
+    if (!BoxionAuth::verifyCsrfToken($csrf)) { $error = 'Token CSRF invalide'; }
     else {
-        switch (\$action) {
+        switch ($action) {
             case 'restart_wireguard':
-                exec('sudo systemctl restart wg-quick@wg0 2>&1', \$output, \$return);
-                \$message = (\$return === 0) ? 'WireGuard redémarré' : 'Erreur redémarrage';
+                exec('sudo systemctl restart wg-quick@wg0 2>&1', $output, $return);
+                $message = ($return === 0) ? 'WireGuard redémarré' : 'Erreur redémarrage';
                 break;
         }
     }
 }
 
-\$wgStats = getWireGuardStats();
-\$dbPeers = getDatabasePeers();
-\$totalPeers = count(\$dbPeers);
-\$activePeers = 0;
-foreach (\$wgStats['peers'] as \$peer) {
-    if (\$peer['connected'] ?? false) \$activePeers++;
+$wgStats = getWireGuardStats();
+$dbPeers = getDatabasePeers();
+$totalPeers = count($dbPeers);
+$activePeers = 0;
+foreach ($wgStats['peers'] as $peer) {
+    if ($peer['connected'] ?? false) $activePeers++;
 }
 ?>
 <!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Boxion Dashboard</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f8f9fa;color:#333}.header{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;padding:20px 0}.container{max-width:1200px;margin:0 auto;padding:0 20px}.header-content{display:flex;justify-content:space-between;align-items:center}.main{padding:30px 0}.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:20px;margin-bottom:30px}.stat-card{background:white;padding:20px;border-radius:10px;box-shadow:0 2px 4px rgba(0,0,0,0.1);text-align:center}.stat-value{font-size:2.5em;font-weight:bold;margin-bottom:5px}.stat-value.green{color:#48bb78}.stat-value.blue{color:#4299e1}.stat-value.orange{color:#ed8936}.stat-label{color:#666;font-size:0.9em}.card{background:white;border-radius:10px;padding:25px;box-shadow:0 2px 4px rgba(0,0,0,0.1);margin-bottom:20px}.table{width:100%;border-collapse:collapse;font-size:0.9em}.table th,.table td{padding:12px;text-align:left;border-bottom:1px solid #e2e8f0}.table th{background:#f7fafc;font-weight:600}.status{display:inline-block;padding:4px 12px;border-radius:20px;font-size:0.8em;font-weight:bold}.status.online{background:#c6f6d5;color:#22543d}.status.offline{background:#fed7d7;color:#742a2a}.btn{display:inline-block;padding:8px 16px;background:#667eea;color:white;text-decoration:none;border-radius:6px;font-size:0.9em;border:none;cursor:pointer;margin-right:10px}.btn:hover{background:#5a67d8}.pubkey{font-family:monospace;font-size:0.8em;word-break:break-all}.logout-form{display:inline}</style><script>setTimeout(()=>location.reload(),30000);</script></head><body><div class="header"><div class="container"><div class="header-content"><h1>🛡️ Boxion Dashboard</h1><div>Connecté: <?=h(\$_SESSION['username'])?> | <a href="../" style="color:white;opacity:0.8">🏠 Accueil</a> | <form method="POST" action="logout.php" class="logout-form"><button type="submit" style="background:none;border:none;color:white;opacity:0.8;cursor:pointer">🚪 Déconnexion</button></form></div></div></div></div><div class="main"><div class="container"><?php if(isset(\$message)):?><div style="padding:12px;border-radius:6px;margin-bottom:20px;border-left:4px solid #48bb78;background:#f0fff4;color:#22543d"><?=h(\$message)?></div><?php endif;?><div class="stats-grid"><div class="stat-card"><div class="stat-value green"><?=\$activePeers?></div><div class="stat-label">Connexions actives</div></div><div class="stat-card"><div class="stat-value blue"><?=\$totalPeers?></div><div class="stat-label">Peers enregistrés</div></div><div class="stat-card"><div class="stat-value <?=\$wgStats['status']==='active'?'green':'orange'?>"><?=\$wgStats['status']==='active'?'ACTIF':'INACTIF'?></div><div class="stat-label">Statut WireGuard</div></div><div class="stat-card"><div class="stat-value blue"><?=\$wgStats['interface']['port']??51820?></div><div class="stat-label">Port d'écoute</div></div></div><div class="card"><h2>⚡ Actions rapides</h2><form method="POST" style="display:inline"><input type="hidden" name="csrf_token" value="<?=BoxionAuth::getCsrfToken()?>"><button type="submit" name="action" value="restart_wireguard" class="btn">🔄 Redémarrer WireGuard</button></form><a href="../api/" class="btn">🔌 API</a></div><div class="card"><h2>🌐 Connexions actives</h2><?php if(empty(\$wgStats['peers'])):?><p style="color:#666;font-style:italic">Aucune connexion active</p><?php else:?><table class="table"><thead><tr><th>Clé publique</th><th>Endpoint</th><th>IPs autorisées</th><th>Dernière connexion</th><th>Statut</th></tr></thead><tbody><?php foreach(\$wgStats['peers'] as \$peer):?><tr><td class="pubkey"><?=h(substr(\$peer['public_key'],0,20))?>...</td><td><?=h(\$peer['endpoint']??'N/A')?></td><td><?=h(implode(', ',\$peer['allowed_ips']))?></td><td><?=h(\$peer['latest_handshake']??'Jamais')?></td><td><span class="status <?=(\$peer['connected']??false)?'online':'offline'?>"><?=(\$peer['connected']??false)?'En ligne':'Hors ligne'?></span></td></tr><?php endforeach;?></tbody></table><?php endif;?></div><div class="card"><h2>📋 Peers enregistrés</h2><?php if(empty(\$dbPeers)):?><p style="color:#666;font-style:italic">Aucun peer enregistré</p><?php else:?><table class="table"><thead><tr><th>Nom</th><th>Clé publique</th><th>IPv6</th><th>Date d'enregistrement</th></tr></thead><tbody><?php foreach(\$dbPeers as \$peer):?><tr><td><strong><?=h(\$peer['name'])?></strong></td><td class="pubkey"><?=h(substr(\$peer['pubkey'],0,20))?>...</td><td><?=h(\$peer['ipv6'])?></td><td><?=date('d/m/Y H:i',strtotime(\$peer['created_at']))?></td></tr><?php endforeach;?></tbody></table><?php endif;?></div></div></div></body></html>
