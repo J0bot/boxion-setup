@@ -10,7 +10,12 @@ set -euo pipefail
 # 🎯 CONFIGURATION & VARIABLES
 # ========================================
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Script directory (compatible avec curl | bash)
+if [[ -n "${BASH_SOURCE[0]:-}" ]]; then
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+else
+    SCRIPT_DIR="/tmp"
+fi
 API_DIR="/var/www/boxion-api"
 WG_CONFIG="/etc/wireguard/wg0.conf"
 DB_FILE="/var/lib/boxion/peers.db"
@@ -112,26 +117,48 @@ setup_wireguard() {
     log_info "Configuration WireGuard..."
     
     # Génération de la clé privée du serveur
+    log_info "Génération des clés WireGuard..."
     local server_private_key
-    server_private_key=$(wg genkey)
-    local server_public_key
-    server_public_key=$(echo "$server_private_key" | wg pubkey)
-    
-    # Détection de l'interface réseau principale
-    local interface
-    interface=$(ip route get 8.8.8.8 | awk 'NR==1 {print $5}')
-    
-    # Détection du préfixe IPv6
-    local ipv6_prefix
-    ipv6_prefix=$(ip -6 addr show "$interface" | grep "inet6.*global" | head -1 | awk '{print $2}' | cut -d'/' -f1)
-    
-    if [[ -z "$ipv6_prefix" ]]; then
-        log_error "Impossible de détecter le préfixe IPv6"
+    if ! server_private_key=$(wg genkey); then
+        log_error "Échec génération clé privée WireGuard"
         exit 1
     fi
     
+    local server_public_key
+    if ! server_public_key=$(echo "$server_private_key" | wg pubkey); then
+        log_error "Échec génération clé publique WireGuard"
+        exit 1
+    fi
+    log_success "Clés WireGuard générées"
+    
+    # Détection de l'interface réseau principale
+    log_info "Détection de l'interface réseau..."
+    local interface
+    if ! interface=$(ip route get 8.8.8.8 | awk 'NR==1 {print $5}'); then
+        log_error "Échec détection interface réseau"
+        exit 1
+    fi
+    log_success "Interface détectée: $interface"
+    
+    # Détection du préfixe IPv6
+    log_info "Détection du préfixe IPv6..."
+    local ipv6_prefix
+    if ! ipv6_prefix=$(ip -6 addr show "$interface" | grep "inet6.*global" | head -1 | awk '{print $2}' | cut -d'/' -f1); then
+        log_error "Échec détection préfixe IPv6 sur interface $interface"
+        exit 1
+    fi
+    
+    if [[ -z "$ipv6_prefix" ]]; then
+        log_error "Aucun préfixe IPv6 global trouvé sur interface $interface"
+        log_info "Interfaces disponibles:"
+        ip -6 addr show | grep "inet6.*global" || true
+        exit 1
+    fi
+    log_success "Préfixe IPv6 détecté: $ipv6_prefix"
+    
     # Configuration WireGuard
-    cat > "$WG_CONFIG" << EOF
+    log_info "Création du fichier de configuration WireGuard..."
+    if ! cat > "$WG_CONFIG" << EOF
 [Interface]
 PrivateKey = $server_private_key
 Address = ${ipv6_prefix%:*}:1::1/112
@@ -147,17 +174,42 @@ PostDown = ip6tables -D FORWARD -o wg0 -j ACCEPT
 PostDown = ip6tables -t nat -D POSTROUTING -o $interface -j MASQUERADE
 
 EOF
+    then
+        log_error "Échec création fichier $WG_CONFIG"
+        exit 1
+    fi
+    log_success "Fichier WireGuard créé: $WG_CONFIG"
     
     # Activation du service
-    systemctl enable wg-quick@wg0
-    systemctl start wg-quick@wg0
+    log_info "Activation du service WireGuard..."
+    if ! systemctl enable wg-quick@wg0; then
+        log_error "Échec activation service wg-quick@wg0"
+        exit 1
+    fi
+    log_success "Service wg-quick@wg0 activé"
+    
+    log_info "Démarrage du service WireGuard..."
+    if ! systemctl start wg-quick@wg0; then
+        log_error "Échec démarrage service wg-quick@wg0"
+        systemctl status wg-quick@wg0 || true
+        exit 1
+    fi
+    log_success "Service WireGuard démarré"
     
     # Sauvegarde des variables pour l'API
-    echo "SERVER_PUBLIC_KEY=$server_public_key" > /tmp/boxion-config.env
-    echo "IPV6_PREFIX=${ipv6_prefix%:*}:1::" >> /tmp/boxion-config.env
-    echo "INTERFACE=$interface" >> /tmp/boxion-config.env
+    log_info "Sauvegarde des variables de configuration..."
+    if ! {
+        echo "SERVER_PUBLIC_KEY=$server_public_key" > /tmp/boxion-config.env
+        echo "IPV6_PREFIX=${ipv6_prefix%:*}:1::" >> /tmp/boxion-config.env
+        echo "INTERFACE=$interface" >> /tmp/boxion-config.env
+    }; then
+        log_error "Échec sauvegarde variables configuration"
+        exit 1
+    fi
+    log_success "Variables sauvegardées dans /tmp/boxion-config.env"
     
     log_success "WireGuard configuré (Clé publique: ${server_public_key:0:20}...)"
+    log_info "Fonction setup_wireguard terminée avec succès"
 }
 
 # ========================================
