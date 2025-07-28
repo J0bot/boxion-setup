@@ -58,7 +58,7 @@ sudo ./setup.sh
 
 **1️⃣ Télécharger le script :**
 ```bash
-wget https://raw.githubusercontent.com/[USER]/boxion-setup/main/client-setup.sh
+wget https://raw.githubusercontent.com/J0bot/boxion-setup/main/client-setup.sh
 chmod +x client-setup.sh
 ```
 
@@ -93,7 +93,7 @@ sudo ./client-setup.sh
 
 **1️⃣ Télécharger le script :**
 ```bash
-wget https://raw.githubusercontent.com/[USER]/boxion-setup/main/setup.sh
+wget https://raw.githubusercontent.com/J0bot/boxion-setup/main/setup.sh
 chmod +x setup.sh
 ```
 
