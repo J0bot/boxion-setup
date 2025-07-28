@@ -70,12 +70,16 @@ EXEMPLES:
 EOF
 }
 
-# Paramètres par défaut
-DOMAIN=""
-API_TOKEN=""
-IPV6_PREFIX=""
-PORT="51820"
-WAN_IF=""
+# Paramètres par défaut (avec support variables d'environnement)
+DOMAIN="${DOMAIN:-}"
+API_TOKEN="${API_TOKEN:-}"
+IPV6_PREFIX="${IPV6_PREFIX:-}"
+PORT="${PORT:-51820}"
+WAN_IF="${WAN_IF:-}"
+COMPANY_NAME="${COMPANY_NAME:-Gasser IT Services}"
+INCLUDE_LEGAL="${INCLUDE_LEGAL:-false}"
+ADMIN_USERNAME="${ADMIN_USERNAME:-admin}"
+ADMIN_PASSWORD="${ADMIN_PASSWORD:-}"
 MODULES_TO_INSTALL=("all")
 VALIDATE_ONLY=false
 DRY_RUN=false
@@ -134,9 +138,17 @@ save_installation_state() {
 validate_prerequisites() {
     log_step "VALIDATION" "Prérequis système" "1/5"
     
-    # Vérification root
-    validate_or_fatal "VALIDATION" "[[ \$UID -eq 0 ]]" "Installation requiert les privilèges root"
-    log_success "VALIDATION" "Privilèges root validés"
+    # Vérification root (sauf pour validation-only)
+    if [[ "$VALIDATE_ONLY" == "false" ]]; then
+        validate_or_fatal "VALIDATION" "[[ \$UID -eq 0 ]]" "Installation requiert les privilèges root"
+        log_success "VALIDATION" "Privilèges root validés"
+    else
+        if [[ $UID -eq 0 ]]; then
+            log_success "VALIDATION" "Privilèges root détectés (validation-only)"
+        else
+            log_warn "VALIDATION" "Pas de privilèges root (validation-only - OK)"
+        fi
+    fi
     
     # Vérification OS
     if [[ -f /etc/debian_version ]]; then
@@ -228,7 +240,7 @@ validate_configuration() {
     
     # Validation préfixe IPv6
     if [[ -n "$IPV6_PREFIX" ]]; then
-        if [[ "$IPV6_PREFIX" =~ ^[0-9a-f:]+$ ]]; then
+        if [[ "$IPV6_PREFIX" =~ ^[0-9a-fA-F:]+$ ]]; then
             log_success "VALIDATION" "Préfixe IPv6: ${IPV6_PREFIX}::/64"
         else
             log_fatal "VALIDATION" "Format de préfixe IPv6 invalide: $IPV6_PREFIX"

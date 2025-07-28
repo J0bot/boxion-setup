@@ -47,8 +47,20 @@ rm -rf /etc/wireguard/server_public.key
 
 # ====== Suppression application ======
 echo "🗂️  Suppression application Boxion..."
-rm -rf /var/www/boxion-api
-rm -rf /var/lib/boxion
+# Sécurité: validation avant suppression critique
+if [[ -d "/var/www/boxion-api" ]]; then
+    echo "  → Suppression /var/www/boxion-api"
+    rm -rf /var/www/boxion-api
+else
+    echo "  → /var/www/boxion-api déjà absent"
+fi
+
+if [[ -d "/var/lib/boxion" ]]; then
+    echo "  → Suppression /var/lib/boxion"
+    rm -rf /var/lib/boxion
+else
+    echo "  → /var/lib/boxion déjà absent"
+fi
 
 # ====== Suppression configuration Nginx ======
 echo "🌐 Suppression configuration Nginx..."

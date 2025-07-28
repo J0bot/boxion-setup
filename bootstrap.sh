@@ -1,6 +1,51 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# ====== GESTION DE SIGNAUX POUR CLEANUP ======
+cleanup() {
+    local exit_code=$?
+    echo
+    echo "🧹 Nettoyage en cours..."
+    
+    # Suppression fichiers temporaires
+    rm -f /tmp/boxion-*-vars.sh 2>/dev/null || true
+    rm -f /tmp/php-syntax.log 2>/dev/null || true
+    rm -f /tmp/nginx-test.log 2>/dev/null || true
+    
+    # Arrêt services si partiellement configurés
+    systemctl stop nginx 2>/dev/null || true
+    systemctl stop wg-quick@wg0 2>/dev/null || true
+    
+    if [[ $exit_code -ne 0 ]]; then
+        echo "❌ Installation interrompue ou échouée"
+        echo "📋 Consultez les logs pour plus de détails"
+        echo "🔄 Vous pouvez relancer le script après correction"
+    fi
+    
+    exit $exit_code
+}
+
+# Installation des traps pour tous les signaux critiques
+trap cleanup EXIT
+trap cleanup INT
+trap cleanup TERM
+trap cleanup HUP
+
+# ====== PROTECTION CONTRE EXÉCUTIONS CONCURRENTES ======
+LOCK_FILE="/var/lock/boxion-bootstrap.lock"
+FLOCK_FD=200
+
+# Tentative de verrouillage exclusif
+exec 200>"$LOCK_FILE"
+if ! flock -n 200; then
+    echo "❌ ERREUR: Une autre installation Boxion est déjà en cours"
+    echo "🔒 Fichier de verrouillage: $LOCK_FILE"
+    echo "⏳ Attendez la fin de l'installation en cours ou supprimez le fichier si bloqué"
+    exit 1
+fi
+
+echo "🔒 Verrouillage acquisition réussi - installation sécurisée"
+
 # 🚀 BOXION FULL AUTO BOOTSTRAP - MODE SERVEUR
 # Usage: curl -fsSL https://raw.githubusercontent.com/J0bot/boxion-setup/main/bootstrap.sh | bash
 # Ou avec paramètres: DOMAIN="ton.domaine" EMAIL="toi@domaine" bash bootstrap.sh
@@ -41,7 +86,21 @@ if [[ "$INTERACTIVE_MODE" == "true" ]] && [[ -z "$DOMAIN" ]]; then
     echo "  3. Domaine par défaut (tunnel.milkywayhub.org)"
     echo
     read -p "🌐 Nom de domaine ou IP [tunnel.milkywayhub.org]: " DOMAIN_INPUT
-    DOMAIN="${DOMAIN_INPUT:-tunnel.milkywayhub.org}"
+    
+    # Validation format domaine/IP
+    if [[ -n "$DOMAIN_INPUT" ]]; then
+        if [[ ! "$DOMAIN_INPUT" =~ ^[a-zA-Z0-9.-]+$ ]]; then
+            echo "❌ ERREUR: Format domaine invalide (caractères autorisés: a-z, 0-9, ., -)"
+            exit 1
+        fi
+        if [[ ${#DOMAIN_INPUT} -gt 253 ]]; then
+            echo "❌ ERREUR: Domaine trop long (max 253 caractères)"
+            exit 1
+        fi
+        DOMAIN="$DOMAIN_INPUT"
+    else
+        DOMAIN="tunnel.milkywayhub.org"
+    fi
     echo "🌐 Domaine sélectionné: $DOMAIN"
 elif [[ -z "$DOMAIN" ]]; then
     DOMAIN="tunnel.milkywayhub.org"
@@ -108,7 +167,21 @@ echo "🔐 === CREDENTIALS ADMIN ==="
 # Configuration admin
 if [[ "$INTERACTIVE_MODE" == "true" ]] && [[ -z "$ADMIN_USERNAME" ]]; then
     read -p "👤 Nom d'utilisateur admin [admin]: " ADMIN_USER_INPUT
-    ADMIN_USERNAME="${ADMIN_USER_INPUT:-admin}"
+    
+    # Validation nom utilisateur admin
+    if [[ -n "$ADMIN_USER_INPUT" ]]; then
+        if [[ ! "$ADMIN_USER_INPUT" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+            echo "❌ ERREUR: Nom utilisateur invalide (caractères autorisés: a-z, 0-9, _, -)"
+            exit 1
+        fi
+        if [[ ${#ADMIN_USER_INPUT} -lt 2 || ${#ADMIN_USER_INPUT} -gt 32 ]]; then
+            echo "❌ ERREUR: Nom utilisateur doit faire entre 2 et 32 caractères"
+            exit 1
+        fi
+        ADMIN_USERNAME="$ADMIN_USER_INPUT"
+    else
+        ADMIN_USERNAME="admin"
+    fi
 elif [[ -z "$ADMIN_USERNAME" ]]; then
     ADMIN_USERNAME="admin"
 fi
@@ -118,6 +191,15 @@ echo "👤 Utilisateur admin: $ADMIN_USERNAME"
 if [[ "$INTERACTIVE_MODE" == "true" ]] && [[ -z "$ADMIN_PASSWORD" ]]; then
     read -p "🔑 Mot de passe admin (laissez vide pour génération automatique): " ADMIN_PASS_INPUT
     if [[ -n "$ADMIN_PASS_INPUT" ]]; then
+        # Validation sécurité mot de passe
+        if [[ ${#ADMIN_PASS_INPUT} -lt 8 ]]; then
+            echo "❌ ERREUR: Mot de passe trop court (minimum 8 caractères)"
+            exit 1
+        fi
+        if [[ ! "$ADMIN_PASS_INPUT" =~ [A-Z] ]] || [[ ! "$ADMIN_PASS_INPUT" =~ [a-z] ]] || [[ ! "$ADMIN_PASS_INPUT" =~ [0-9] ]]; then
+            echo "❌ ERREUR: Mot de passe doit contenir au moins 1 majuscule, 1 minuscule et 1 chiffre"
+            exit 1
+        fi
         ADMIN_PASSWORD="$ADMIN_PASS_INPUT"
         echo "🔑 Mot de passe admin: [personnalisé]"
     else
@@ -221,25 +303,39 @@ apt-get install -y git jq curl openssl
 REPO_DIR="/root/boxion-api"
 if [[ -d "$REPO_DIR" ]]; then
   echo "🔄 Mise à jour du repository existant..."
-  cd "$REPO_DIR"
+  if ! cd "$REPO_DIR"; then
+    echo "❌ ERREUR: Impossible d'accéder au répertoire $REPO_DIR"
+    exit 1
+  fi
   git pull
 else
   echo "📥 Clonage du repository..."
-  git clone https://github.com/J0bot/boxion-setup.git "$REPO_DIR"
-  cd "$REPO_DIR"
+  if ! git clone https://github.com/J0bot/boxion-setup.git "$REPO_DIR"; then
+    echo "❌ ERREUR: Échec clonage repository"
+    exit 1
+  fi
+  if ! cd "$REPO_DIR"; then
+    echo "❌ ERREUR: Impossible d'accéder au répertoire cloné $REPO_DIR"
+    exit 1
+  fi
 fi
 
-# ====== Installation serveur ======
-echo "⚙️  Installation du serveur Boxion..."
-chmod +x setup.sh
+# ====== Installation serveur modulaire ======
+echo "⚙️  Installation du serveur Boxion (architecture modulaire)..."
+chmod +x install/provisioner.sh
 
-# Export des variables de personnalisation pour setup.sh
+# Export des variables de personnalisation pour les modules
 export COMPANY_NAME="$COMPANY_NAME"
 export INCLUDE_LEGAL="$INCLUDE_LEGAL"
 export ADMIN_USERNAME="$ADMIN_USERNAME"
 export ADMIN_PASSWORD="$ADMIN_PASSWORD"
+export DOMAIN="$DOMAIN"
+export API_TOKEN="$TOKEN"
+export IPV6_PREFIX="$PREFIX"
+export PORT="51820"
+export WAN_IF="$WAN_IF"
 
-./setup.sh --domain "$DOMAIN" --token "$TOKEN" --prefix "$PREFIX" --port 51820 --wan-if "$WAN_IF"
+./install/provisioner.sh
 
 # ====== Configuration TLS ======
 echo "🔒 Configuration TLS avec Let's Encrypt..."

@@ -239,11 +239,21 @@ EOF
     fi
     
     log_info "$MODULE_NAME" "Initialisation base SQLite: $DB_PATH"
-    if ! sqlite3 "$DB_PATH" < "$SQL_DIR/init.sql" 2>/tmp/sqlite-init.log; then
-        log_error_context "$MODULE_NAME" "Échec initialisation base" "$(cat /tmp/sqlite-init.log)"
-        rm -f /tmp/sqlite-init.log
+    
+    # Fichier temporaire sécurisé
+    local temp_log
+    temp_log=$(mktemp) || {
+        log_error "$MODULE_NAME" "Impossible de créer fichier temporaire"
+        return 1
+    }
+    
+    if ! sqlite3 "$DB_PATH" < "$SQL_DIR/init.sql" 2>"$temp_log"; then
+        log_error_context "$MODULE_NAME" "Échec initialisation base" "$(cat "$temp_log")"
+        rm -f "$temp_log"
         return 1
     fi
+    
+    rm -f "$temp_log"
     
     # Permissions pour accès web
     chown www-data:www-data "$DB_PATH"
@@ -650,20 +660,33 @@ abort(404, 'route_not_found');
 ?>
 EOF
 
-    # Permissions sécurisées
-    chown -R www-data:www-data "$API_DIR"
-    chmod 644 "$api_file"
-    
-    # Validation syntaxe PHP
-    if ! php -l "$api_file" >/dev/null 2>/tmp/php-syntax.log; then
-        log_error_context "$MODULE_NAME" "Erreur syntaxe PHP" "$(cat /tmp/php-syntax.log)"
-        rm -f /tmp/php-syntax.log
+    # Permissions sécurisées avec gestion d'erreur
+    if ! chown -R www-data:www-data "$API_DIR" 2>/dev/null; then
+        log_error "$MODULE_NAME" "Échec définition propriétaire: $API_DIR"
         return 1
     fi
     
+    if ! chmod 644 "$api_file" 2>/dev/null; then
+        log_error "$MODULE_NAME" "Échec définition permissions: $api_file"
+        return 1
+    fi
+    
+    # Validation syntaxe PHP avec fichier temporaire sécurisé
+    local temp_php_log
+    temp_php_log=$(mktemp) || {
+        log_error "$MODULE_NAME" "Impossible de créer fichier temporaire"
+        return 1
+    }
+    
+    if ! php -l "$api_file" >/dev/null 2>"$temp_php_log"; then
+        log_error_context "$MODULE_NAME" "Erreur syntaxe PHP" "$(cat "$temp_php_log")"
+        rm -f "$temp_php_log"
+        return 1
+    fi
+    
+    rm -f "$temp_php_log"
     local api_lines=$(wc -l < "$api_file")
     log_success "$MODULE_NAME" "API REST générée ($api_lines lignes PHP)"
-    rm -f /tmp/php-syntax.log
 }
 
 # ====== VALIDATION API ======

@@ -106,12 +106,26 @@ echo
 
 # ====== 4. Test API Local ======
 echo "🌐 === TEST API ==="
+
+# Initialisation sécurisée des variables critiques
+TOKEN=""
+DOMAIN=""
+
 if [[ -f /var/www/boxion-api/.env ]]; then
-    TOKEN=$(grep API_TOKEN /var/www/boxion-api/.env | cut -d= -f2 | tr -d '"')
-    DOMAIN=$(grep ENDPOINT_DOMAIN /var/www/boxion-api/.env | cut -d= -f2 | tr -d '"')
+    TOKEN=$(grep API_TOKEN /var/www/boxion-api/.env | cut -d= -f2 | tr -d '"' 2>/dev/null || echo "")
+    DOMAIN=$(grep ENDPOINT_DOMAIN /var/www/boxion-api/.env | cut -d= -f2 | tr -d '"' 2>/dev/null || echo "")
     
-    echo "Token trouvé: ${TOKEN:0:8}..."
-    echo "Domaine: $DOMAIN"
+    if [[ -n "$TOKEN" && -n "$DOMAIN" ]]; then
+        echo "Token trouvé: ${TOKEN:0:8}..."
+        echo "Domaine: $DOMAIN"
+    else
+        echo "⚠️  Variables .env incomplètes (TOKEN ou DOMAIN manquant)"
+        TOKEN=""
+        DOMAIN=""
+    fi
+else
+    echo "❌ Fichier .env manquant - tests API ignorés"
+fi
     
     echo -n "Test API local (HTTP): "
     if curl -s -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
@@ -126,10 +140,11 @@ if [[ -f /var/www/boxion-api/.env ]]; then
              http://localhost/api/peers 2>&1 | head -10
     fi
     
-    if [[ "$DOMAIN" != "localhost" ]]; then
+    # Tests externes uniquement si variables valides
+    if [[ -n "$TOKEN" && -n "$DOMAIN" && "$DOMAIN" != "localhost" ]]; then
         echo -n "Test API externe (HTTP): "
         if curl -s --max-time 10 -H "Authorization: Bearer $TOKEN" \
-           http://$DOMAIN/api/peers >/dev/null 2>&1; then
+           "http://$DOMAIN/api/peers" >/dev/null 2>&1; then
             echo "✅ ACCESSIBLE"
         else
             echo "❌ INACCESSIBLE"
@@ -137,11 +152,13 @@ if [[ -f /var/www/boxion-api/.env ]]; then
         
         echo -n "Test API externe (HTTPS): "
         if curl -s --max-time 10 -H "Authorization: Bearer $TOKEN" \
-           https://$DOMAIN/api/peers >/dev/null 2>&1; then
+           "https://$DOMAIN/api/peers" >/dev/null 2>&1; then
             echo "✅ ACCESSIBLE"
         else
             echo "❌ INACCESSIBLE"
         fi
+    elif [[ -z "$TOKEN" || -z "$DOMAIN" ]]; then
+        echo "⚠️  Tests API externes ignorés (variables manquantes)"
     fi
 else
     echo "❌ Fichier .env manquant"
