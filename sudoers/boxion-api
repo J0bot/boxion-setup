@@ -1,1 +1,0 @@
-www-data ALL=(root) NOPASSWD: /var/www/boxion-api/bin/wg_add_peer.sh, /var/www/boxion-api/bin/wg_del_peer.sh, /var/www/boxion-api/bin/replay_ndp.sh
