@@ -9,8 +9,10 @@ log_info "Vérification des prérequis..."
 if ! command -v apt-get >/dev/null 2>&1; then
   log_error "apt-get requis (Debian/Ubuntu)"; exit 1
 fi
-if ! ip -6 addr show | grep -q "inet6.*global"; then
-  log_error "Aucune IPv6 globale détectée sur ce VPS"; exit 1
+if ip -6 addr show scope global 2>/dev/null | grep -q 'inet6'; then
+  log_success "IPv6 globale détectée"
+else
+  log_warning "IPv6 globale non détectée maintenant (RA/Cloud init). On continue: détection fine à l'étape réseau."
 fi
 
 ensure_dir /etc/boxion
