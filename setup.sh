@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 
+# ⚠️ DEPRECATION: ce script est remplacé par l'installateur modulaire.
+# Utilisez désormais: sudo bash installer/install.sh [--domain mon.domaine] [--email admin@mail]
+# Le script legacy s'arrête ici pour éviter des installations incohérentes.
+echo "[Boxion] Ce script est déprécié. Utilisez: sudo bash installer/install.sh --domain tunnel.milkywayhub.org --email toi@mail.tld" >&2
+exit 1
+
 # 🚀 BOXION VPN SERVER - INSTALLATION SIMPLE ET SÉCURISÉE
 # Installation complète d'un serveur tunnel IPv6 via WireGuard
 # Simple, sécurisé, fonctionnel !
@@ -92,8 +98,10 @@ install_packages() {
         "php-fpm"
         "php-sqlite3"
         "php-json"
+        "php-curl"
         "sqlite3"
         "iptables"
+        "ndppd"
         "openssl"
         "curl"
     )
@@ -140,38 +148,37 @@ setup_wireguard() {
     fi
     log_success "Interface détectée: $interface"
     
-    # Détection du préfixe IPv6
+    # Détection du préfixe IPv6 (préférence route kernel sur l'interface)
     log_info "Détection du préfixe IPv6..."
-    local ipv6_prefix
-    if ! ipv6_prefix=$(ip -6 addr show "$interface" | grep "inet6.*global" | head -1 | awk '{print $2}' | cut -d'/' -f1); then
-        log_error "Échec détection préfixe IPv6 sur interface $interface"
+    local route_prefix
+    route_prefix=$(ip -6 route show dev "$interface" | awk '/proto kernel/ && $1 ~ /\/[0-9]+/ {print $1; exit}')
+    if [[ -z "$route_prefix" ]]; then
+        route_prefix=$(ip -6 route show dev "$interface" | awk '/\/[0-9]+/ {print $1; exit}')
+    fi
+    if [[ -z "$route_prefix" ]]; then
+        log_error "Impossible de détecter le préfixe IPv6 sur $interface"
+        ip -6 addr show dev "$interface" || true
+        ip -6 route show dev "$interface" || true
         exit 1
     fi
-    
-    if [[ -z "$ipv6_prefix" ]]; then
-        log_error "Aucun préfixe IPv6 global trouvé sur interface $interface"
-        log_info "Interfaces disponibles:"
-        ip -6 addr show | grep "inet6.*global" || true
-        exit 1
-    fi
-    log_success "Préfixe IPv6 détecté: $ipv6_prefix"
+    local prefix_base="${route_prefix%/*}"
+    local prefix_len="${route_prefix##*/}"
+    log_success "Préfixe IPv6 détecté: $prefix_base/$prefix_len"
     
     # Configuration WireGuard
     log_info "Création du fichier de configuration WireGuard..."
     if ! cat > "$WG_CONFIG" << EOF
 [Interface]
 PrivateKey = $server_private_key
-Address = ${ipv6_prefix%:*}:1::1/112
+Address = ${prefix_base%::}::1/64
 ListenPort = 51820
 SaveConfig = false
 
-# Règles de routage IPv6
+# Règles de routage IPv6 (pas de NAT66 par défaut)
 PostUp = ip6tables -A FORWARD -i wg0 -j ACCEPT
 PostUp = ip6tables -A FORWARD -o wg0 -j ACCEPT
-PostUp = ip6tables -t nat -A POSTROUTING -o $interface -j MASQUERADE
 PostDown = ip6tables -D FORWARD -i wg0 -j ACCEPT
 PostDown = ip6tables -D FORWARD -o wg0 -j ACCEPT
-PostDown = ip6tables -t nat -D POSTROUTING -o $interface -j MASQUERADE
 
 EOF
     then
@@ -179,6 +186,30 @@ EOF
         exit 1
     fi
     log_success "Fichier WireGuard créé: $WG_CONFIG"
+
+    # Activer le forwarding IPv6 et le proxy NDP
+    log_info "Activation du forwarding IPv6 et proxy NDP..."
+    cat > /etc/sysctl.d/99-boxion.conf << EOF
+net.ipv6.conf.all.forwarding=1
+net.ipv6.conf.default.forwarding=1
+net.ipv6.conf.all.accept_ra=2
+net.ipv6.conf.default.accept_ra=2
+net.ipv6.conf.all.proxy_ndp=1
+net.ipv6.conf.$interface.proxy_ndp=1
+EOF
+    sysctl -p /etc/sysctl.d/99-boxion.conf || true
+
+    # Configuration ndppd (proxy NDP) pour le préfixe détecté
+    log_info "Configuration ndppd pour $prefix_base/64..."
+    cat > /etc/ndppd.conf << EOF
+proxy $interface {
+    rule ${prefix_base%::}::/64 {
+        auto
+    }
+}
+EOF
+    systemctl enable ndppd >/dev/null 2>&1 || true
+    systemctl restart ndppd || true
     
     # Activation du service
     log_info "Activation du service WireGuard..."
@@ -200,7 +231,7 @@ EOF
     log_info "Sauvegarde des variables de configuration..."
     if ! {
         echo "SERVER_PUBLIC_KEY=$server_public_key" > /tmp/boxion-config.env
-        echo "IPV6_PREFIX=${ipv6_prefix%:*}:1::" >> /tmp/boxion-config.env
+        echo "IPV6_PREFIX_BASE=${prefix_base%::}::" >> /tmp/boxion-config.env
         echo "INTERFACE=$interface" >> /tmp/boxion-config.env
     }; then
         log_error "Échec sauvegarde variables configuration"
@@ -267,13 +298,65 @@ setup_api() {
 DB_PATH=$DB_FILE
 API_TOKEN=$api_token
 SERVER_PUBLIC_KEY=$SERVER_PUBLIC_KEY
-IPV6_PREFIX=$IPV6_PREFIX
+IPV6_PREFIX_BASE=$IPV6_PREFIX_BASE
 INTERFACE=$INTERFACE
+ENDPOINT_PORT=51820
 EOF
     
     # Permissions sécurisées
     chown www-data:www-data "$API_DIR/.env"
     chmod 600 "$API_DIR/.env"
+    
+    # Création du helper root pour appliquer la config WireGuard
+    cat > /usr/local/sbin/boxion-wg-apply << 'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+WG_CONF="/etc/wireguard/wg0.conf"
+
+cmd="${1:-}"
+case "$cmd" in
+  add-peer)
+    pubkey="${2:-}"
+    ipv6="${3:-}"
+    if [[ -z "$pubkey" || -z "$ipv6" ]]; then
+      echo "Usage: $0 add-peer <pubkey> <ipv6/128>" >&2; exit 2
+    fi
+    if ! [[ "$pubkey" =~ ^[A-Za-z0-9+/]{43}=$ ]]; then
+      echo "Invalid pubkey" >&2; exit 2
+    fi
+    if ! echo "$ipv6" | grep -Eq '^[0-9a-fA-F:]+/128$'; then
+      echo "Invalid IPv6" >&2; exit 2
+    fi
+    umask 077
+    {
+      printf "\n[Peer]\n"
+      printf "PublicKey = %s\n" "$pubkey"
+      printf "AllowedIPs = %s\n" "$ipv6"
+    } >> "$WG_CONF"
+    tmp="/run/wg0.stripped.conf"
+    wg-quick strip wg0 > "$tmp"
+    wg syncconf wg0 "$tmp"
+    rm -f "$tmp"
+    ;;
+  *)
+    echo "Usage: $0 add-peer <pubkey> <ipv6/128>" >&2
+    exit 2
+    ;;
+esac
+EOF
+    chmod 750 /usr/local/sbin/boxion-wg-apply
+    chown root:root /usr/local/sbin/boxion-wg-apply
+    echo "www-data ALL=(root) NOPASSWD: /usr/local/sbin/boxion-wg-apply" > /etc/sudoers.d/boxion-wg
+    chmod 440 /etc/sudoers.d/boxion-wg
+
+    # Génération Basic Auth admin pour le dashboard
+    local admin_password
+    admin_password=$(openssl rand -base64 16)
+    local ht_hash
+    ht_hash=$(openssl passwd -apr1 "$admin_password")
+    echo "admin:$ht_hash" > /etc/nginx/.htpasswd-boxion
+    echo "$admin_password" > /tmp/boxion-admin.txt
     
     # Création de l'API principale
     cat > "$API_DIR/api/index.php" << 'EOF'
@@ -304,7 +387,7 @@ function jsonResponse($data, $status = 200) {
 
 function validateToken() {
     global $env;
-    $headers = getallheaders();
+    $headers = function_exists('getallheaders') ? getallheaders() : [];
     $token = $headers['Authorization'] ?? '';
     
     if (!str_starts_with($token, 'Bearer ')) {
@@ -312,25 +395,24 @@ function validateToken() {
     }
     
     $provided_token = substr($token, 7);
-    if (!hash_equals($env['API_TOKEN'], $provided_token)) {
+    if (!hash_equals($env['API_TOKEN'] ?? '', $provided_token)) {
         jsonResponse(['error' => 'Token invalide'], 403);
     }
 }
 
-function getNextIPv6($prefix) {
+function getNextIPv6($prefixBase) {
     global $env;
-    
     // Connexion à la base
-    $db = new PDO('sqlite:' . $env['DB_PATH']);
+    $db = new PDO('sqlite:' . ($env['DB_PATH'] ?? ''));
     $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-    
     // Recherche du prochain ID disponible
     $stmt = $db->query("SELECT MAX(id) as max_id FROM peers");
     $result = $stmt->fetch();
     $next_id = ($result['max_id'] ?? 0) + 1;
-    
-    // Génération de l'adresse IPv6
-    return $prefix . sprintf('%x', $next_id) . '/112';
+    // Décaler pour éviter ::1 (serveur)
+    $offset = 0x100; // commence à ::100
+    $hext = dechex($next_id + $offset);
+    return $prefixBase . $hext . '/128';
 }
 
 // Gestion des requêtes
@@ -377,22 +459,29 @@ try {
     }
     
     // Attribution de l'adresse IPv6
-    $ipv6_address = getNextIPv6($env['IPV6_PREFIX']);
+    $ipv6_address = getNextIPv6($env['IPV6_PREFIX_BASE']);
     
     // Insertion du nouveau peer
     $stmt = $db->prepare("INSERT INTO peers (name, public_key, ipv6_address) VALUES (?, ?, ?)");
     $stmt->execute([$name, $public_key, $ipv6_address]);
-    
-    // Ajout à la configuration WireGuard
-    $wg_config = "\n[Peer]\nPublicKey = $public_key\nAllowedIPs = $ipv6_address\n";
-    file_put_contents('/etc/wireguard/wg0.conf', $wg_config, FILE_APPEND | LOCK_EX);
-    
-    // Rechargement de WireGuard
-    exec('wg syncconf wg0 <(wg-quick strip wg0)');
-    
-    // Réponse avec la configuration client
+
+    // Ajout à la config WireGuard via helper root
+    $cmd = 'sudo /usr/local/sbin/boxion-wg-apply add-peer ' 
+        . escapeshellarg($public_key) . ' ' . escapeshellarg($ipv6_address);
+    exec($cmd, $out, $rc);
+    if ($rc !== 0) {
+        jsonResponse(['error' => 'Échec application config WG'], 500);
+    }
+
+    $host = $_SERVER['HTTP_HOST'] ?? ($_SERVER['SERVER_NAME'] ?? 'localhost');
+    $host = preg_replace('/:.*/', '', $host);
+    $endpoint = $host . ':' . ($env['ENDPOINT_PORT'] ?? '51820');
     jsonResponse([
         'success' => true,
+        // Compat top-level pour scripts simples
+        'Address' => $ipv6_address,
+        'PublicKey' => $env['SERVER_PUBLIC_KEY'],
+        'Endpoint' => $endpoint,
         'config' => [
             'interface' => [
                 'PrivateKey' => '[VOTRE_CLE_PRIVEE]',
@@ -400,7 +489,7 @@ try {
             ],
             'peer' => [
                 'PublicKey' => $env['SERVER_PUBLIC_KEY'],
-                'Endpoint' => $_SERVER['SERVER_NAME'] . ':51820',
+                'Endpoint' => $endpoint,
                 'AllowedIPs' => '::/0'
             ]
         ]
@@ -411,7 +500,6 @@ try {
     jsonResponse(['error' => 'Erreur interne du serveur'], 500);
 }
 EOF
-    
     # Permissions
     chown -R www-data:www-data "$API_DIR"
     
@@ -425,7 +513,23 @@ EOF
 
 setup_nginx() {
     log_info "Configuration Nginx..."
-    
+    # Détection du socket PHP-FPM
+    local php_fpm_sock=""
+    if [[ -S /run/php/php-fpm.sock ]]; then
+        php_fpm_sock="/run/php/php-fpm.sock"
+    else
+        local php_version
+        php_version=$(php-fpm -v 2>/dev/null | awk '/PHP/{print $2}' | cut -d. -f1,2 || true)
+        if [[ -n "$php_version" && -S "/run/php/php${php_version}-fpm.sock" ]]; then
+            php_fpm_sock="/run/php/php${php_version}-fpm.sock"
+        else
+            php_fpm_sock="$(ls /run/php/php*-fpm.sock 2>/dev/null | head -n1 || true)"
+        fi
+    fi
+    if [[ -z "$php_fpm_sock" ]]; then
+        php_fpm_sock="/run/php/php-fpm.sock"
+    fi
+
     # Configuration du site
     cat > "/etc/nginx/sites-available/boxion-api" << EOF
 server {
@@ -441,16 +545,20 @@ server {
     error_log /var/log/nginx/boxion-error.log;
     
     # API endpoint
+    location = /api { return 301 /api/; }
     location /api/ {
-        try_files \$uri \$uri/ =404;
-        location ~ \.php$ {
-            include snippets/fastcgi-php.conf;
-            fastcgi_pass unix:/var/run/php/php-fpm.sock;
-        }
+        index index.php;
+        try_files \$uri /api/index.php;
+    }
+    location ~ ^/api/.*\.php$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:$php_fpm_sock;
     }
     
     # Interface web simple
     location / {
+        auth_basic "Boxion Admin";
+        auth_basic_user_file /etc/nginx/.htpasswd-boxion;
         try_files \$uri \$uri/ /index.html;
     }
     
@@ -569,6 +677,13 @@ main() {
         log_warning "🔑 TOKEN API (à garder secret):"
         echo "$(cat /tmp/boxion-token.txt)"
         rm -f /tmp/boxion-token.txt
+    fi
+    
+    if [[ -f /tmp/boxion-admin.txt ]]; then
+        echo ""
+        log_warning "🔐 Identifiants Dashboard (HTTP Basic Auth):"
+        echo "admin: $(cat /tmp/boxion-admin.txt)"
+        rm -f /tmp/boxion-admin.txt
     fi
     
     echo ""

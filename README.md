@@ -36,11 +36,13 @@ sudo ./client-setup.sh
 ### 🖥️ **2. Déployer votre propre serveur tunnel (optionnel)**
 
 ```bash
-# Sur un VPS avec IPv6
-sudo ./setup.sh
+# Sur un VPS Debian 12 avec IPv6 et un nom de domaine pointé (AAAA)
+sudo bash installer/install.sh --domain tunnel.milkywayhub.org --email admin@example.com
+# ou via variables env
+sudo BOXION_DOMAIN=tunnel.milkywayhub.org BOXION_LE_EMAIL=admin@example.com bash installer/install.sh
 ```
 
-**Votre serveur tunnel est opérationnel !**
+**Le serveur configure WireGuard, NDP proxy, API, Dashboard et TLS (Let's Encrypt).**
 
 ---
 
@@ -89,32 +91,52 @@ sudo ./client-setup.sh
 - **OS** : Debian 12 (recommandé)
 - **Accès** : Root sur le VPS
 
+#### 🌐 **Réseau / DNS / Firewall**
+
+- **DNS**: créez un enregistrement `AAAA` pour votre domaine (ex: `tunnel.milkywayhub.org`) pointant vers l'IPv6 de votre VPS. Un `A` (IPv4) est optionnel mais pratique.
+- **Ports ouverts**: `80/tcp` (HTTP, ACME), `443/tcp` (HTTPS), `51820/udp` (WireGuard).
+- **UFW (si activé)**:
+
+  ```bash
+  sudo ufw allow 80/tcp
+  sudo ufw allow 443/tcp
+  sudo ufw allow 51820/udp
+  ```
+
+- **Infomaniak/OpenStack**: vérifiez aussi les règles de sécurité (security groups) côté cloud.
+
 #### ⚡ **Installation Simple**
 
-**1️⃣ Télécharger le script :**
+**1️⃣ Récupérer le projet :**
+
 ```bash
-wget https://raw.githubusercontent.com/J0bot/boxion-setup/main/setup.sh
-chmod +x setup.sh
+sudo apt-get update -qq && sudo apt-get install -y git
+git clone https://github.com/J0bot/boxion-setup.git
+cd boxion-setup
 ```
 
-**2️⃣ Exécuter l'installation :**
+**2️⃣ Lancer l'installation :**
+
 ```bash
-sudo ./setup.sh
+sudo BOXION_DOMAIN=tunnel.milkywayhub.org BOXION_LE_EMAIL=admin@example.com bash installer/install.sh
 ```
 
 **3️⃣ Résultat :**
 ```
 🎉 INSTALLATION TERMINÉE AVEC SUCCÈS !
 ✅ Serveur tunnel opérationnel
-📍 API disponible sur: http://[IP-VPS]/api/
-🌐 Dashboard: http://[IP-VPS]/
+📍 API: <https://tunnel.milkywayhub.org/api/>
+🌐 Dashboard: <https://tunnel.milkywayhub.org/>
 
-🔑 TOKEN API (à garder secret):
-abc123def456...
+🔑 Token API maître (secret) affiché et sauvegardé dans /etc/boxion/boxion.env
+🔐 Admin (Basic Auth): login admin, mot de passe dans /etc/boxion/admin-password.txt
 ```
 
-**4️⃣ Distribuer le token :**
-Donnez ce token aux utilisateurs qui veulent connecter leur Boxion.
+**4️⃣ OTP d'enrôlement (recommandé) :**
+
+- Ouvrez <https://tunnel.milkywayhub.org/admin/> (Basic Auth)
+- Générez un OTP (usage unique, TTL court) et donnez-le au client
+- Le client peut utiliser soit l'OTP, soit le token maître
 
 ---
 
@@ -184,10 +206,12 @@ journalctl -u wg-quick@boxion
 
 ### 🔒 **Sécurité**
 
-- ✅ **Clés privées** : Jamais stockées sur le serveur
-- ✅ **API** : Protégée par token
-- ✅ **Base de données** : Requiêtes préparées
-- ✅ **Permissions** : Principe du moindre privilège
+- ✅ **TLS**: HTTPS automatique via Let's Encrypt (si domaine + email)
+- ✅ **API**: Bearer Token maître ou **OTP** (usage unique, limité dans le temps)
+- ✅ **Rate limiting**: limite basique sur /api/ pour éviter l'abus
+- ✅ **Clés privées**: jamais stockées côté serveur
+- ✅ **DB**: requêtes préparées, SQLite avec droits restreints
+- ✅ **Privilèges**: helper root minimal via sudoers (PHP n'édite pas wg directement)
 
 ---
 

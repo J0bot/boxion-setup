@@ -1,0 +1,11 @@
+[Interface]
+PrivateKey = ${SERVER_PRIVATE_KEY}
+Address = ${SERVER_WG_ADDRESS}
+ListenPort = 51820
+SaveConfig = false
+
+# IPv6 forwarding only (no NAT66)
+PostUp = ip6tables -A FORWARD -i wg0 -j ACCEPT
+PostUp = ip6tables -A FORWARD -o wg0 -j ACCEPT
+PostDown = ip6tables -D FORWARD -i wg0 -j ACCEPT
+PostDown = ip6tables -D FORWARD -o wg0 -j ACCEPT

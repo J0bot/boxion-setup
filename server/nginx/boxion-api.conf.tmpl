@@ -1,0 +1,46 @@
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${SERVER_NAME};
+
+    root ${API_DIR};
+    index index.php;
+
+    access_log /var/log/nginx/boxion-access.log;
+    error_log /var/log/nginx/boxion-error.log;
+
+    location = /api { return 301 /api/; }
+    location /api/ {
+        index index.php;
+        try_files $uri /api/index.php;
+        limit_req zone=api burst=10 nodelay;
+    }
+    location ~ ^/api/.*\.php$ {
+        limit_req zone=api burst=10 nodelay;
+        include snippets/fastcgi-php.conf;
+        fastcgi_param HTTP_AUTHORIZATION $http_authorization;
+        fastcgi_pass unix:${PHP_FPM_SOCK};
+    }
+
+    location /admin/ {
+        auth_basic "Boxion Admin";
+        auth_basic_user_file /etc/nginx/.htpasswd-boxion;
+        index index.php;
+        try_files $uri /admin/index.php;
+    }
+    location ~ ^/admin/.*\.php$ {
+        auth_basic "Boxion Admin";
+        auth_basic_user_file /etc/nginx/.htpasswd-boxion;
+        include snippets/fastcgi-php.conf;
+        fastcgi_param HTTP_AUTHORIZATION $http_authorization;
+        fastcgi_pass unix:${PHP_FPM_SOCK};
+    }
+
+    location / {
+        auth_basic "Boxion Admin";
+        auth_basic_user_file /etc/nginx/.htpasswd-boxion;
+        try_files $uri $uri/ /index.html;
+    }
+
+    location ~ /\.env { deny all; }
+}

@@ -52,6 +52,18 @@ check_requirements() {
             exit 1
         fi
     fi
+
+    # Vérification jq (parsing JSON)
+    if ! command -v jq >/dev/null 2>&1; then
+        log_info "Installation de jq..."
+        if command -v apt-get >/dev/null 2>&1; then
+            export DEBIAN_FRONTEND=noninteractive
+            apt-get update -qq && apt-get install -y jq >/dev/null
+        else
+            log_error "jq requis pour parser la réponse JSON"
+            exit 1
+        fi
+    fi
     
     log_success "Prérequis validés"
 }
@@ -90,11 +102,11 @@ get_configuration() {
         fi
     done
     
-    # Token API
+    # Token API ou OTP (usage unique)
     while [[ -z "$API_TOKEN" ]]; do
-        echo -n "🔑 Token API (fourni par l'administrateur du tunnel): "
+        echo -n "🔑 Token API ou OTP (fourni par l'administrateur): "
         read -r API_TOKEN
-        
+        # OTP = 32 hex, API token = 64 hex (par défaut). On accepte >=32.
         if [[ ${#API_TOKEN} -lt 32 ]]; then
             log_error "Le token semble trop court (minimum 32 caractères)"
             API_TOKEN=""
@@ -176,10 +188,10 @@ EOF
             ;;
     esac
     
-    # Extraction de la configuration
-    IPV6_ADDRESS=$(echo "$response" | grep -o '"Address":"[^"]*"' | cut -d'"' -f4)
-    SERVER_PUBLIC_KEY=$(echo "$response" | grep -o '"PublicKey":"[^"]*"' | cut -d'"' -f4)
-    SERVER_ENDPOINT=$(echo "$response" | grep -o '"Endpoint":"[^"]*"' | cut -d'"' -f4)
+    # Extraction de la configuration (JSON)
+    IPV6_ADDRESS=$(echo "$response" | jq -r '.Address // empty')
+    SERVER_PUBLIC_KEY=$(echo "$response" | jq -r '.PublicKey // empty')
+    SERVER_ENDPOINT=$(echo "$response" | jq -r '.Endpoint // empty')
     
     if [[ -z "$IPV6_ADDRESS" || -z "$SERVER_PUBLIC_KEY" || -z "$SERVER_ENDPOINT" ]]; then
         log_error "Réponse serveur invalide"
