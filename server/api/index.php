@@ -1,7 +1,7 @@
 <?php
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: POST, OPTIONS');
+header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { exit; }
@@ -25,6 +25,44 @@ if (is_file($envFile)) {
             $env[trim($k)] = trim($v);
         }
     }
+}
+
+// Route: GET /api/status -> diagnostics JSON (auth required)
+$reqPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && preg_match('#/api/status/?$#', $reqPath)) {
+    try {
+        $dbPath = $env['DB_PATH'] ?? '/var/lib/boxion/peers.db';
+        $db = new PDO('sqlite:' . $dbPath);
+        $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    } catch (Exception $e) {
+        jsonResponse(['error' => 'DB erreur'], 500);
+    }
+
+    // Auth: master API token only (ne consomme pas d'OTP)
+    $auth = getAuthHeader();
+    if (stripos($auth, 'Bearer ') !== 0) {
+        jsonResponse(['error' => 'Token manquant'], 401);
+    }
+    $token = substr($auth, 7);
+    if (empty($env['API_TOKEN']) || !hash_equals($env['API_TOKEN'], $token)) {
+        jsonResponse(['error' => 'Token invalide'], 403);
+    }
+    $out = shell_exec('sudo /usr/local/sbin/boxion-diag 2>&1');
+    if ($out === null) {
+        jsonResponse(['error' => 'Diagnostic indisponible'], 500);
+    }
+    $sections = preg_split('/^=== (.+) ===$/m', $out, -1, PREG_SPLIT_DELIM_CAPTURE);
+    $diag = [];
+    if ($sections && count($sections) > 1) {
+        for ($i = 1; $i < count($sections); $i += 2) {
+            $title = trim($sections[$i]);
+            $body = trim($sections[$i+1] ?? '');
+            $diag[$title] = $body;
+        }
+    } else {
+        $diag['raw'] = $out;
+    }
+    jsonResponse(['success' => true, 'auth_method' => 'api', 'diag' => $diag]);
 }
 
 function getAuthHeader() {

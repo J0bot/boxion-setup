@@ -56,6 +56,8 @@ sudo BOXION_DOMAIN=tunnel.milkywayhub.org BOXION_LE_EMAIL=admin@example.com bash
 - **Accès** : Sudo/root sur votre Boxion
 - **Serveur** : URL du serveur tunnel + token API
 
+> Important: si vous prévoyez d'installer **YunoHost** sur votre Boxion, faites d'abord la **connexion VPN** avec ce script, vérifiez la connectivité IPv6 (ping6, curl -6), puis seulement ensuite lancez l'installation YunoHost. Cela garantit que le diagnostic et l'émission de certificats utilisent déjà l'IPv6 publique fournie par le tunnel.
+
 #### ⚡ **Installation Simple**
 
 **1️⃣ Télécharger le script :**

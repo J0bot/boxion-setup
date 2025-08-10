@@ -114,6 +114,18 @@ code{background:#0f1530;border:1px solid #33406b;border-radius:6px;padding:.2rem
     </table>
   </div>
 
+  <div class="card">
+    <h3>Diagnostic serveur</h3>
+    <p>Consultez l'état IPv6, NDP proxy, WireGuard et Nginx.</p>
+    <p><a href="/admin/status.php">🔎 Ouvrir le diagnostic</a></p>
+  </div>
+
+  <div class="card">
+    <h3>Probe réseau</h3>
+    <p>Testez un hôte (AAAA, ping6, HTTP/HTTPS en IPv6).</p>
+    <p><a href="/admin/probe.php">🧪 Ouvrir la probe</a></p>
+  </div>
+
   <div class="footer">Dashboard protégé par Basic Auth (admin). Accès API: <code class="mono">/api/</code></div>
 </div>
 </body>

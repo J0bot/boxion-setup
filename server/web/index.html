@@ -1,35 +1,58 @@
 <!doctype html>
 <html lang="fr">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Boxion Dashboard</title>
-<style>
-body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial,sans-serif;margin:2rem;background:#0b1020;color:#e9eef7}
-.container{max-width:860px;margin:0 auto}
-.card{background:#121a33;border:1px solid #1e294d;border-radius:12px;padding:1.25rem;margin-bottom:1rem}
-code{background:#0f1530;border:1px solid #33406b;border-radius:6px;padding:.2rem .4rem}
-a{color:#9dd1ff}
-.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Boxion Tunnel • Accueil</title>
+  <style>
+    :root{color-scheme:dark}
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial,sans-serif;margin:2rem;background:#0b1020;color:#e9eef7}
+    .container{max-width:920px;margin:0 auto}
+    .card{background:#121a33;border:1px solid #1e294d;border-radius:12px;padding:1.25rem;margin-bottom:1rem}
+    code{background:#0f1530;border:1px solid #33406b;border-radius:6px;padding:.2rem .4rem}
+    a{color:#9dd1ff;text-decoration:none}
+    a:hover{text-decoration:underline}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
+    .muted{color:#a7b2d6}
+    .cta{display:inline-block;background:#2a6df4;border:1px solid #2a6df4;color:white;padding:.6rem 1rem;border-radius:8px}
+    .cta:hover{filter:brightness(1.1)}
+  </style>
 </head>
 <body>
-<div class="container">
-  <h1>🚀 Boxion Dashboard</h1>
-  <div class="card">
-    <h2>API</h2>
-    <p>Point d'accès: <code class="mono">/api/</code></p>
-    <p>Authentification: <strong>Bearer Token</strong> ou <strong>OTP</strong> à usage unique.</p>
+  <div class="container">
+    <h1>🚀 Boxion Tunnel</h1>
+    <p class="muted">Donner une IPv6 publique à votre Boxion via un tunnel WireGuard.</p>
+
+    <div class="card">
+      <h2>À propos</h2>
+      <p>
+        Ce serveur fournit:
+      </p>
+      <ul>
+        <li>Une <strong>API</strong> d'enrôlement: <code class="mono">/api/</code></li>
+        <li>Un <strong>Dashboard Admin</strong> (protégé): <a href="/admin/">/admin/</a></li>
+        <li>Un <strong>tunnel WireGuard</strong> attribuant une IPv6 /128 publique aux clients</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>Démarrer</h2>
+      <ol>
+        <li>En tant qu'admin, ouvrez <a href="/admin/">/admin/</a> et générez un <strong>OTP</strong>.</li>
+        <li>Sur votre Boxion, exécutez le script client et entrez l'URL + OTP.</li>
+      </ol>
+      <pre><code class="mono">wget https://raw.githubusercontent.com/J0bot/boxion-setup/main/client-setup.sh
+chmod +x client-setup.sh
+sudo ./client-setup.sh</code></pre>
+    </div>
+
+    <div class="card">
+      <h2>Ressources</h2>
+      <p>
+        Besoin d'aide ou d'accompagnement ?
+        <a class="cta" href="https://milkywayhub.org" rel="noopener">Aller sur milkywayhub.org →</a>
+      </p>
+    </div>
   </div>
-  <div class="card">
-    <h2>Administration</h2>
-    <p>Page d'administration: <a href="/admin/">/admin/</a> (protégée par Basic Auth)</p>
-    <p>Générez un OTP d'enrôlement puis utilisez-le sur un client pour s'enregistrer.</p>
-  </div>
-  <div class="card">
-    <h2>Client</h2>
-    <p>Le client enverra sa clé publique et recevra son IPv6 /128 et la clé publique du serveur.</p>
-  </div>
-</div>
 </body>
 </html>
