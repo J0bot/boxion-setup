@@ -52,7 +52,12 @@ if [[ "$ADDR_NOPFX" == *"::"* ]]; then
   SV="${ADDR_NOPFX%::*}::1"
 fi
 
-TARGET=${SV:-"2001:4860:4860::8888"}
+# Cible de test: priorité au serveur dérivé; override possible via BOXION_TEST_V6; fallback Cloudflare
+TEST_FALLBACK="${BOXION_TEST_V6:-}"
+if [[ -z "$TEST_FALLBACK" ]]; then
+  TEST_FALLBACK="2606:4700:4700::1111"  # Cloudflare v6
+fi
+TARGET="${SV:-$TEST_FALLBACK}"
 if ping6 -c1 "$TARGET" >/dev/null 2>&1; then
   echo "IPv6 OK (ping $TARGET)"
 else

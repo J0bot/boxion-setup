@@ -9,3 +9,8 @@ PostUp = ip6tables -A FORWARD -i wg0 -j ACCEPT
 PostUp = ip6tables -A FORWARD -o wg0 -j ACCEPT
 PostDown = ip6tables -D FORWARD -i wg0 -j ACCEPT
 PostDown = ip6tables -D FORWARD -o wg0 -j ACCEPT
+
+# Prefer wg0 for the routed prefix to avoid RA on-link route taking precedence
+# This ensures traffic to peers (e.g., ${IPV6_PREFIX_BASE_TRIM}::101/128) uses wg0
+PostUp = ip -6 route replace ${IPV6_PREFIX_BASE_TRIM}::/64 dev %i metric 50
+PostDown = ip -6 route del ${IPV6_PREFIX_BASE_TRIM}::/64 dev %i || true

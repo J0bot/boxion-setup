@@ -236,6 +236,60 @@ journalctl -u wg-quick@boxion
 
 ---
 
+## ♻️ **Réinitialisation / Désinstallation**
+
+> Danger: opérations destructives. Les scripts ci-dessous suppriment la configuration Boxion. Un backup compressé est créé côté VPS.
+
+### 🖥️ VPS (Serveur)
+
+- Désinstaller proprement:
+
+```bash
+cd ~/boxion-setup
+sudo bash tools/server-uninstall.sh
+```
+
+- Réinitialiser (désinstaller puis réinstaller):
+
+```bash
+cd ~/boxion-setup
+sudo BOXION_DOMAIN=tunnel.milkywayhub.org \
+     BOXION_LE_EMAIL=admin@example.com \
+     bash tools/server-reset.sh
+```
+
+Notes:
+- Un backup est créé: `/root/boxion-backup-<timestamp>.tar.gz`.
+- Après réinstall, si la portée IPv6 externe n’est pas immédiate: `sudo bash tools/server-ndp-ensure.sh`.
+- Les enregistrements DNS publics (AAAA) restent manuels chez Infomaniak (voir recommandations plus haut).
+
+### 📱 Client (Boxion)
+
+- Désinstaller proprement:
+
+```bash
+cd ~/boxion-setup
+sudo bash tools/client-uninstall.sh
+```
+
+- Réinitialiser (désinstaller puis réinstaller):
+
+```bash
+cd ~/boxion-setup
+sudo bash tools/client-reset.sh
+```
+
+Mode non-interactif possible:
+
+```bash
+sudo BOXION_SERVER_URL=https://tunnel.milkywayhub.org \
+     BOXION_API_TOKEN=XXXX... \
+     BOXION_NAME=mon-boxion \
+     bash tools/client-reset.sh
+```
+
+---
+
 ## 🏗️ **Architecture Technique**
 
 ### 🔌 **Comment ça marche**
