@@ -26,6 +26,8 @@ log_error() { echo -e "${RED}❌ $1${NC}"; }
 SERVER_URL=""
 API_TOKEN=""
 BOXION_NAME=""
+DNS_LINE=""
+SERVER_V6=""
 
 # ========================================
 # 🔍 VALIDATION PRÉALABLE
@@ -202,6 +204,39 @@ EOF
 }
 
 # ========================================
+# 🧭 PRÉPARATION DNS (resolvconf/resolvectl)
+# ========================================
+
+ensure_dns_support() {
+    log_info "Détection du gestionnaire DNS pour WireGuard..."
+    DNS_LINE=""
+
+    if command -v resolvectl >/dev/null 2>&1 || \
+       command -v systemd-resolve >/dev/null 2>&1 || \
+       command -v resolvconf >/dev/null 2>&1; then
+        # Un gestionnaire est présent, on peut définir DNS dans wg-quick
+        DNS_LINE="DNS = 2001:4860:4860::8888, 2001:4860:4860::8844"
+    else
+        # Tentative d'installation silencieuse si possible
+        if command -v apt-get >/dev/null 2>&1; then
+            log_info "Installation de resolvconf pour gérer le DNS..."
+            export DEBIAN_FRONTEND=noninteractive
+            if apt-get update -qq && apt-get install -y resolvconf >/dev/null 2>&1; then
+                DNS_LINE="DNS = 2001:4860:4860::8888, 2001:4860:4860::8844"
+                log_success "resolvconf installé"
+            elif apt-get install -y openresolv >/dev/null 2>&1; then
+                DNS_LINE="DNS = 2001:4860:4860::8888, 2001:4860:4860::8844"
+                log_success "openresolv installé"
+            else
+                log_warning "Impossible d'installer resolvconf; la ligne DNS sera omise"
+            fi
+        else
+            log_warning "Aucun gestionnaire DNS détecté; la ligne DNS sera omise"
+        fi
+    fi
+}
+
+# ========================================
 # ⚙️ CONFIGURATION WIREGUARD LOCAL
 # ========================================
 
@@ -215,7 +250,7 @@ setup_local_wireguard() {
 [Interface]
 PrivateKey = $PRIVATE_KEY
 Address = $IPV6_ADDRESS
-DNS = 2001:4860:4860::8888, 2001:4860:4860::8844
+$DNS_LINE
 
 [Peer]
 PublicKey = $SERVER_PUBLIC_KEY
@@ -231,6 +266,20 @@ EOF
     systemctl enable wg-quick@boxion 2>/dev/null || true
     
     log_success "Configuration WireGuard créée"
+}
+
+# ========================================
+# 🔎 DÉRIVATION DE L'IPv6 SERVEUR (wg0)
+# ========================================
+
+derive_server_ipv6() {
+    # Ex: IPV6_ADDRESS = 2001:1600:16:10::103/128 -> SERVER_V6 = 2001:1600:16:10::1
+    local addr_no_prefix="${IPV6_ADDRESS%%/*}"
+    if [[ "$addr_no_prefix" == *"::"* ]]; then
+        SERVER_V6="${addr_no_prefix%::*}::1"
+    else
+        SERVER_V6=""
+    fi
 }
 
 # ========================================
@@ -252,12 +301,16 @@ start_connection() {
         exit 1
     fi
     
-    # Vérification de la connectivité IPv6
+    # Vérification de la connectivité IPv6 (sans dépendre du DNS)
     sleep 3
-    if ping6 -c 1 google.com >/dev/null 2>&1; then
-        log_success "Connectivité IPv6 validée"
+    local target="${SERVER_V6:-}"
+    if [[ -z "$target" ]]; then
+        target="2001:4860:4860::8888"  # Fallback: Google Public DNS v6
+    fi
+    if ping6 -c 1 "$target" >/dev/null 2>&1; then
+        log_success "Connectivité IPv6 validée (ping $target)"
     else
-        log_warning "Connectivité IPv6 non confirmée (normal selon votre réseau)"
+        log_warning "IPv6 non confirmée (ping $target). Vérifiez pare-feu et réseau, cela peut être normal."
     fi
 }
 
@@ -296,6 +349,8 @@ main() {
     get_configuration
     generate_keys
     register_with_server
+    ensure_dns_support
+    derive_server_ipv6
     setup_local_wireguard
     start_connection
     show_status

@@ -86,6 +86,20 @@ sudo ./client-setup.sh
 🌐 Votre Boxion est maintenant accessible depuis Internet !
 ```
 
+#### 🔎 Résolveurs DNS côté client (important)
+
+- La ligne `DNS = ...` dans `/etc/wireguard/boxion.conf` demande à `wg-quick` de configurer un résolveur via `resolvconf` ou `systemd-resolved`.
+- Le script `client-setup.sh` détecte automatiquement:
+  - Si `resolvectl`/`systemd-resolve`/`resolvconf` est présent, il ajoute `DNS = 2001:4860:4860::8888, 2001:4860:4860::8844`.
+  - Sinon, il n’écrit pas de ligne `DNS =` pour éviter l’erreur `resolvconf: command not found` et laisser votre système gérer le DNS.
+- Ceci n’a aucun lien avec vos enregistrements DNS publics (AAAA). Cela concerne uniquement la résolution de noms sur la machine cliente.
+
+Pour corriger une installation existante (sans ré-enrôler):
+
+```bash
+sudo bash tools/client-fix.sh
+```
+
 ### 🖥️ **Serveur Tunnel (VPS)**
 
 #### 🚨 **Prérequis**
@@ -106,6 +120,23 @@ sudo ./client-setup.sh
   ```
 
 - **Infomaniak/OpenStack**: vérifiez aussi les règles de sécurité (security groups) côté cloud.
+
+#### 🌍 DNS public (AAAA) & YunoHost — recommandations
+
+- Boxion n’édite pas automatiquement votre zone DNS Infomaniak. Chaque Boxion reçoit une IPv6 /128 publique, et vous créez un enregistrement `AAAA` pointant dessus.
+- Avec **YunoHost**:
+  - Faites d’abord la connexion VPN (IPv6 OK), puis installez YunoHost.
+  - Dans l’admin YunoHost (Diagnose), suivez les « DNS records suggestions » et appliquez-les chez Infomaniak.
+  - Conservez/ajoutez l’`AAAA` du sous-domaine de la Boxion vers son IPv6 /128 fournie par le tunnel.
+- Récupérer l’IPv6 à publier:
+  - Côté client: `grep ^Address /etc/wireguard/boxion.conf`
+  - Côté serveur: `sqlite3 /var/lib/boxion/peers.db 'SELECT name,ipv6_address FROM peers;'`
+- Vérifier depuis Internet:
+
+```bash
+dig AAAA boxion1.milkywayhub.org +short
+ping6 -c1 boxion1.milkywayhub.org
+```
 
 #### ⚡ **Installation Simple**
 
@@ -144,6 +175,22 @@ sudo BOXION_DOMAIN=tunnel.milkywayhub.org BOXION_LE_EMAIL=admin@example.com bash
 
 ## 🔍 **Vérification et Maintenance**
 
+### 🧰 Diagnostics (web & CLI)
+
+- **Web (admin, Basic Auth)**
+  - `https://tunnel.milkywayhub.org/admin/status.php` — état système (IPv6, NDP, WG, routes, firewall, nginx)
+  - `https://tunnel.milkywayhub.org/admin/probe.php` — tests AAAA/ping6/curl v6 sur une cible
+- **API**
+  - `GET /api/status` — JSON du diagnostic (auth Bearer avec token maître)
+  - Script: `./tools/api-status.sh https://tunnel.milkywayhub.org "$API_TOKEN"`
+- **CLI (VPS)**
+  - `./tools/diag.sh` — diagnostic serveur (wrap du helper root)
+  - `./tools/support-bundle.sh https://tunnel.milkywayhub.org "$API_TOKEN"` — archive à partager (secrets redacted)
+- **CLI (Client)**
+  - `./tools/client-diag.sh [cible]` — diagnostic client (interface, WG, ping6/curl v6)
+  - `./tools/test-ipv6.sh [cible]` — tests IPv6 rapides
+  - `./tools/client-fix.sh` — corrige la ligne `DNS =` selon la présence de resolvconf/resolved
+
 ### 📊 **Commandes Utiles**
 
 ```bash
@@ -172,6 +219,7 @@ sudo systemctl restart wg-quick@boxion
 | Pas d'IPv6 | Redémarrez WireGuard : `sudo systemctl restart wg-quick@boxion` |
 | Connexion impossible | Vérifiez le firewall et l'URL du serveur |
 | Services non accessibles | Vérifiez la config locale de vos services |
+| `wg-quick`: `resolvconf: command not found` | Exécutez `sudo bash tools/client-fix.sh` ou installez `resolvconf`/`openresolv` |
 
 ### 🔍 **Debug Manuel**
 
