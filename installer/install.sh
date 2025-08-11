@@ -10,6 +10,10 @@ require_root
 BOXION_DOMAIN="${BOXION_DOMAIN:-}"
 BOXION_LE_EMAIL="${BOXION_LE_EMAIL:-}"
 
+# Avoid pager interference in scripts
+export SYSTEMD_PAGER=cat
+export PAGER=cat
+
 # Parse minimal flags
 while [[ $# -gt 0 ]]; do
   case "$1" in
