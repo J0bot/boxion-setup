@@ -23,6 +23,7 @@ set_env_var SERVER_PUBLIC_KEY "$server_public_key"
 sed -e "s|\${SERVER_WG_ADDRESS}|$SERVER_WG_ADDRESS|g" \
     -e "s|\${INTERFACE}|$interface|g" \
     -e "s|\${SERVER_PRIVATE_KEY}|$server_private_key|g" \
+    -e "s|\${IPV6_PREFIX_BASE_TRIM}|$trim|g" \
     "$REPO_DIR/server/wireguard/wg0.conf.tmpl" > "$WG_CONF"
 
 chmod 600 "$WG_CONF"

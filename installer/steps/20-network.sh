@@ -19,22 +19,33 @@ if [[ -z "$interface" ]]; then
   log_error "Impossible de détecter une interface réseau"; exit 1
 fi
 
-# Chercher un /64 appris (RA) ou kernel sur cette interface
-route_prefix="$(ip -6 route show dev "$interface" 2>/dev/null | awk '/proto (ra|kernel)/ && $1 ~ /\/[0-9]+/ {print $1; exit}')"
-if [[ -z "$route_prefix" ]]; then
-  route_prefix="$(ip -6 route show dev "$interface" 2>/dev/null | awk '$1 ~ /\/[0-9]+/ {print $1; exit}')"
+# Permettre le forçage du préfixe global (ex: 2a01:abcd:1234:5678::)
+override_prefix="${BOXION_IPV6_PREFIX_BASE:-}"
+if [[ -n "$override_prefix" ]]; then
+  # Normaliser: enlever '::' final s'il existe puis réajouter '::'
+  prefix_trim="${override_prefix%%::}"
+  IPV6_PREFIX_BASE="$prefix_trim::"
+  log_info "Préfixe IPv6 forcé: $IPV6_PREFIX_BASE"
+else
+  # Chercher un préfixe GLOBAL (exclure link-local fe80::/10, ULA fc00::/7, multicast ff00::/8)
+  # 1) RA/kernel sur l'interface
+  route_prefix="$(ip -6 route show dev "$interface" 2>/dev/null | awk '/proto (ra|kernel)/ && $1 ~ /\/[0-9]+/ && $1 !~ /^fe80:/ && $1 !~ /^fc/ && $1 !~ /^fd/ && $1 !~ /^ff/ {print $1; exit}')"
+  # 2) Fallback: toute route globale sur l'interface
+  if [[ -z "$route_prefix" ]]; then
+    route_prefix="$(ip -6 route show dev "$interface" 2>/dev/null | awk '$1 ~ /\/[0-9]+/ && $1 !~ /^fe80:/ && $1 !~ /^fc/ && $1 !~ /^fd/ && $1 !~ /^ff/ {print $1; exit}')"
+  fi
+  # 3) Fallback: une adresse globale sur l'interface (inet6 scope global)
+  if [[ -z "$route_prefix" ]]; then
+    route_prefix="$(ip -6 addr show dev "$interface" scope global 2>/dev/null | awk '/inet6 /{print $2; exit}')"
+  fi
+  if [[ -z "$route_prefix" ]]; then
+    log_error "Aucun préfixe IPv6 GLOBAL détecté (interface: $interface). Fournissez BOXION_IPV6_PREFIX_BASE=2xxx:yyyy:....:zzzz:: et relancez."; exit 1
+  fi
+  prefix_base="${route_prefix%/*}"
+  # Trim trailing '::'
+  prefix_trim="${prefix_base%%::}"
+  IPV6_PREFIX_BASE="$prefix_trim::"
 fi
-if [[ -z "$route_prefix" ]]; then
-  # Dernier recours: n'importe quel /64 global présent
-  route_prefix="$(ip -6 route show 2>/dev/null | awk '/proto (ra|kernel)/ && $1 ~ /::\/[0-9]+/ {print $1; exit}')"
-fi
-if [[ -z "$route_prefix" ]]; then
-  log_error "Impossible de détecter un préfixe IPv6 (interface: $interface)"; exit 1
-fi
-prefix_base="${route_prefix%/*}"
-# Trim trailing '::'
-prefix_trim="${prefix_base%%::}"
-IPV6_PREFIX_BASE="$prefix_trim::"
 
 set_env_var INTERFACE "$interface"
 set_env_var IPV6_PREFIX_BASE "$IPV6_PREFIX_BASE"
