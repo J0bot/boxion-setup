@@ -110,16 +110,54 @@ sudo bash tools/client-fix.sh
 #### 🌐 **Réseau / DNS / Firewall**
 
 - **DNS**: créez un enregistrement `AAAA` pour votre domaine (ex: `tunnel.milkywayhub.org`) pointant vers l'IPv6 de votre VPS. Un `A` (IPv4) est optionnel mais pratique.
-- **Ports ouverts**: `80/tcp` (HTTP, ACME), `443/tcp` (HTTPS), `51820/udp` (WireGuard).
+- **Ports ouverts**: `80/tcp` (HTTP, ACME), `443/tcp` (HTTPS), `51820/udp` (WireGuard), et — si vous utilisez Hurricane Electric — **protocole 41 (IPv4, 6in4)**.
 - **UFW (si activé)**:
 
   ```bash
   sudo ufw allow 80/tcp
   sudo ufw allow 443/tcp
   sudo ufw allow 51820/udp
+  # Pour HE 6in4 (protocole 41 via IPv4)
+  sudo iptables -I INPUT -p 41 -j ACCEPT
   ```
 
 - **Infomaniak/OpenStack**: vérifiez aussi les règles de sécurité (security groups) côté cloud.
+  - Si HE 6in4 est activé, autorisez explicitement **Protocol 41** (IPv4) dans le security group.
+
+### 🌀 HE 6in4 (optionnel) — si pas de /64 natif
+
+Si votre fournisseur ne route pas un `/64` IPv6 vers votre VPS, l'installeur propose automatiquement la configuration d'un tunnel **Hurricane Electric (6in4)**.
+
+- Étape concernée: `installer/steps/15-he-tunnel.sh` (exécutée juste après l'installation des paquets).
+- Le tunnel 6in4 crée une interface `he-ipv6` et vous fournit un `/64` routé publiquement, utilisable pour vos clients.
+
+Ce que l'installeur vous demandera (avec exemples):
+
+```text
+IPv4 publique locale (auto)         : 203.0.113.10
+HE Server IPv4 (TunnelBroker)       : 216.66.80.98
+IPv6 client P2P (/64)               : 2001:470:abcd:1234::2/64
+IPv6 serveur P2P (auto: ::1)        : 2001:470:abcd:1234::1
+Routed /64                          : 2001:470:beef::/64
+MTU                                 : 1480 (défaut)
+Utiliser HE comme route IPv6 par défaut ? [n]
+```
+
+Détails d'implémentation:
+
+- Crée et active `he6in4.service` (systemd) et son env `/etc/boxion/he6in4.env`.
+- Ouvre localement le **protocole 41** (`iptables -I INPUT -p 41 -j ACCEPT`). Pensez aussi au security group cloud.
+- Définit `IPV6_PREFIX_BASE` sur le `/64` routé HE et désactive `ndppd` pour cette configuration (pas de proxy NDP nécessaire).
+- La configuration WireGuard du serveur route automatiquement ce `/64` vers `wg0` (PostUp/PostDown), chaque Boxion recevant un `/128` dans ce `/64`.
+
+Vérifications utiles:
+
+```bash
+sudo systemctl status he6in4
+ip -6 addr show dev he-ipv6
+ip -6 route show dev he-ipv6
+ping6 -c1 2001:470:abcd:1234::1   # IPv6 côté HE (serveur P2P)
+```
 
 #### 🌍 DNS public (AAAA) & YunoHost — recommandations
 
@@ -324,10 +362,6 @@ sudo BOXION_SERVER_URL=https://tunnel.milkywayhub.org \
 **Licence :** MIT - Libre d'utilisation
 
 **Auteur :** Gasser IT Services  
-**Contact :** support@milkywayhub.org
+**Contact :** tunnel@milkywayhub.org
 
 🚀 **Boxion VPN** - Simplifier l'auto-hébergement pour tous !
-
-
-
-

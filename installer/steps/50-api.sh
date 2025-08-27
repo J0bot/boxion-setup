@@ -82,6 +82,8 @@ if [[ -f /etc/boxion/boxion.env ]]; then
 fi
 iface="${ENV[INTERFACE]:-$(ip route get 8.8.8.8 2>/dev/null | awk 'NR==1{print $5}') }"
 prefix="${ENV[IPV6_PREFIX_BASE]:-}"
+api_token="${ENV[API_TOKEN]:-}"
+db_path="${ENV[DB_PATH]:-/var/lib/boxion/peers.db}"
 
 section SYSTEM
 uname -a || true
@@ -92,17 +94,25 @@ echo "INTERFACE=$iface"
 echo "IPV6_PREFIX_BASE=$prefix"
 echo
 
+section SERVICES
+for s in nginx php-fpm "wg-quick@wg0" he6in4 ndppd; do
+  printf "%-14s: " "$s"; systemctl is-active "$s" 2>/dev/null || echo "n/a"
+done
+echo
+
 section SYSCTL
 sysctl net.ipv6.conf.all.forwarding net.ipv6.conf.all.proxy_ndp "net.ipv6.conf.${iface}.proxy_ndp" 2>/dev/null || true
 echo
 
 section ADDRESSES
 ip -6 addr show dev "$iface" || true
+ip -6 addr show dev he-ipv6 2>/dev/null || true
 ip -6 addr show dev wg0 || true
 echo
 
 section ROUTES
 ip -6 route show || true
+ip -6 route show dev he-ipv6 2>/dev/null || true
 echo
 
 section "NDP PROXY"
@@ -113,6 +123,10 @@ echo
 
 section WIREGUARD
 wg show 2>/dev/null || true
+if [[ -f /etc/wireguard/wg0.conf ]]; then
+  echo "--- wg0.conf peers ---"
+  grep -c '^\[Peer\]' /etc/wireguard/wg0.conf 2>/dev/null || true
+fi
 echo
 
 section "FIREWALL (ip6tables FORWARD)"
@@ -124,14 +138,48 @@ if command -v nft >/dev/null 2>&1; then
 fi
 echo
 
+section SUDOERS
+ls -l /etc/sudoers.d/boxion-* 2>/dev/null || true
+echo
+
 section NGINX
 nginx -t 2>&1 || true
 ls -l /etc/nginx/sites-enabled/boxion-api 2>/dev/null || true
+echo
+echo "--- HTTP local ---"
+curl -sI http://127.0.0.1/ | head -n1 || true
+curl -sI http://127.0.0.1/api/ | head -n1 || true
+curl -sI http://127.0.0.1/admin/probe.php | head -n1 || true
 echo
 
 section API
 printf "PHP-FPM: "; php-fpm -v 2>/dev/null | head -n1 || true
 ls -l /var/www/boxion-api 2>/dev/null || true
+echo
+
+section "PHP-FPM SOCKET"
+ls -l /run/php/php*-fpm.sock 2>/dev/null || true
+ss -xl 2>/dev/null | awk '/php.*fpm.*sock/ {print $0}' || true
+echo
+
+section "API LOCAL"
+if [[ -n "$api_token" ]]; then
+  code=$(curl -fsS -o /tmp/boxion_api_status.$$ -w '%{http_code}' -H "Authorization: Bearer $api_token" -H 'Accept: application/json' http://127.0.0.1/api/status || true)
+  echo "GET /api/status -> HTTP $code"
+  head -c 800 /tmp/boxion_api_status.$$ 2>/dev/null || true
+  rm -f /tmp/boxion_api_status.$$ || true
+else
+  echo "API_TOKEN non défini dans /etc/boxion/boxion.env"
+fi
+echo
+
+section DATABASE
+echo "DB_PATH=$db_path"
+stat -c '%A %U:%G %s %n' "$db_path" 2>/dev/null || echo "absent"
+if command -v sqlite3 >/dev/null 2>&1 && [[ -f "$db_path" ]]; then
+  echo "- integrity_check:"
+  sqlite3 "$db_path" 'PRAGMA integrity_check; SELECT "peers",count(1) FROM peers; SELECT "otps",count(1) FROM otps;' 2>/dev/null || true
+fi
 echo
 
 section "PING6/CURL"

@@ -30,6 +30,7 @@ log_info "Démarrage installation modulaire Boxion"
 STEPS=(
   "00-prereqs.sh"
   "10-packages.sh"
+  "15-he-tunnel.sh"
   "20-network.sh"
   "30-wireguard.sh"
   "40-database.sh"

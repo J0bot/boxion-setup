@@ -21,6 +21,13 @@ fi
 
 # Permettre le forçage du préfixe global (ex: 2a01:abcd:1234:5678::)
 override_prefix="${BOXION_IPV6_PREFIX_BASE:-}"
+# Si non fourni via l'environnement, tenter de lire depuis /etc/boxion/boxion.env
+if [[ -z "$override_prefix" ]]; then
+  env_override="$(get_env_var IPV6_PREFIX_BASE || true)"
+  if [[ -n "${env_override:-}" ]]; then
+    override_prefix="$env_override"
+  fi
+fi
 if [[ -n "$override_prefix" ]]; then
   # Normaliser: enlever '::' final s'il existe puis réajouter '::'
   prefix_trim="${override_prefix%%::}"
@@ -54,11 +61,24 @@ log_info "Écriture sysctl..."
 sed "s|\${INTERFACE}|$interface|g" "$REPO_DIR/server/system/sysctl.d/99-boxion.conf" > /etc/sysctl.d/99-boxion.conf
 sysctl -p /etc/sysctl.d/99-boxion.conf || true
 
-log_info "Écriture ndppd.conf..."
-sed -e "s|\${INTERFACE}|$interface|g" \
-    -e "s|\${IPV6_PREFIX_BASE_TRIM}|$prefix_trim|g" \
-    "$REPO_DIR/server/system/ndppd.conf.tmpl" > /etc/ndppd.conf
-systemctl enable ndppd >/dev/null 2>&1 || true
-systemctl restart ndppd || true
+# NDP proxying: activer sauf si explicitement désactivé (HE 6in4 routed /64)
+skip_ndp_val="${BOXION_SKIP_NDPD:-}"
+if [[ -z "${skip_ndp_val:-}" ]]; then
+  skip_ndp_val="$(get_env_var BOXION_SKIP_NDPD || true)"
+fi
+if [[ "${skip_ndp_val:-0}" = "1" ]]; then
+  log_info "Mode HE détecté: ndppd désactivé (routed /64, pas de proxy NDP nécessaire)"
+else
+  log_info "Écriture ndppd.conf..."
+  sed -e "s|\${INTERFACE}|$interface|g" \
+      -e "s|\${IPV6_PREFIX_BASE_TRIM}|$prefix_trim|g" \
+      "$REPO_DIR/server/system/ndppd.conf.tmpl" > /etc/ndppd.conf
+  systemctl enable ndppd >/dev/null 2>&1 || true
+  systemctl restart ndppd || true
+fi
 
-log_success "Réseau IPv6 configuré (proxy NDP)"
+if [[ "${skip_ndp_val:-0}" = "1" ]]; then
+  log_success "Réseau IPv6 configuré (HE 6in4)"
+else
+  log_success "Réseau IPv6 configuré (proxy NDP)"
+fi
