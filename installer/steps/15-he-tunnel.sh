@@ -72,8 +72,22 @@ if [[ "$base_no_pref" == *"::"* ]]; then
 fi
 read -r -p "IPv6 serveur P2P [$HE_TUN_SERVER6]: " inp; HE_TUN_SERVER6="${inp:-$HE_TUN_SERVER6}"
 
-read -r -p "Routed /64 fourni par HE (ex: 2001:470:zzzz::/64): " HE_ROUTED64
-while [[ -z "$HE_ROUTED64" ]]; do read -r -p "Routed /64: " HE_ROUTED64; done
+read -r -p "Préfixe routé fourni par HE (ex: 2001:470:zzzz::/64 ou /48): " HE_ROUTED_PREFIX
+while [[ -z "$HE_ROUTED_PREFIX" ]]; do read -r -p "Préfixe routé (/64 ou /48): " HE_ROUTED_PREFIX; done
+
+# Si un /48 est fourni, choisir un /64 fils pour Boxion (par défaut : :1::/64)
+chosen_wg64=""
+prefix_len="${HE_ROUTED_PREFIX##*/}"
+prefix_base_no_mask="${HE_ROUTED_PREFIX%/*}"
+prefix_base_trim="${prefix_base_no_mask%%::}"
+if [[ "$prefix_len" -eq 64 ]]; then
+  chosen_wg64="${prefix_base_trim}::/64"
+else
+  # Fallback simple pour /48 ou inférieur: utiliser ":1::/64" comme sous-réseau par défaut
+  default_wg64="${prefix_base_trim}:1::/64"
+  read -r -p "Choisir le /64 utilisé par Boxion (défaut: $default_wg64): " inp
+  chosen_wg64="${inp:-$default_wg64}"
+fi
 
 # Default route via HE?
 USE_HE_DEFAULT_ROUTE=false
@@ -100,7 +114,9 @@ HE_SERVER_V4=$HE_SERVER_V4
 HE_TUN_CLIENT6=$HE_TUN_CLIENT6
 HE_TUN_SERVER6=$HE_TUN_SERVER6
 HE_TUN_MTU=$HE_TUN_MTU
-HE_ROUTED64=$HE_ROUTED64
+HE_ROUTED_PREFIX=$HE_ROUTED_PREFIX
+# Compat: exposer aussi le /64 retenu comme HE_ROUTED64
+HE_ROUTED64=$chosen_wg64
 USE_HE_DEFAULT_ROUTE=$([[ $USE_HE_DEFAULT_ROUTE == true ]] && echo 1 || echo 0)
 EOF
 
@@ -133,10 +149,11 @@ if command -v iptables >/dev/null 2>&1; then
 fi
 
 # Set env for next steps (20-network will respect this override)
-trim_routed="${HE_ROUTED64%/*}"; trim_routed="${trim_routed%%::}"
+trim_routed="${chosen_wg64%/*}"; trim_routed="${trim_routed%%::}"
 set_env_var BOXION_HE_ENABLED 1
 set_env_var BOXION_SKIP_NDPD 1
 set_env_var IPV6_PREFIX_BASE "${trim_routed}::"
 
-log_success "Tunnel HE configuré. Préfixe pour Boxion: ${trim_routed}::/64"
+log_success "Tunnel HE configuré. Préfixe routé: ${HE_ROUTED_PREFIX}"
+log_info "/64 choisi pour Boxion: ${trim_routed}::/64"
 log_info "Vérification rapide: ping6 -c1 $HE_TUN_SERVER6"
