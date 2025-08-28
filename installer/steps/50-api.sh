@@ -202,4 +202,11 @@ set_env_var ENDPOINT_PORT 51820
 
 chown -R www-data:www-data "$API_DIR"
 
+# Assurer PHP-FPM actif
+if systemctl list-unit-files | grep -q '^php8.2-fpm\.service'; then
+  systemctl enable --now php8.2-fpm >/dev/null 2>&1 || true
+else
+  systemctl enable --now php-fpm >/dev/null 2>&1 || true
+fi
+
 log_success "API déployée"

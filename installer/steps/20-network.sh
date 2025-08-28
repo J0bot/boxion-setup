@@ -68,6 +68,8 @@ if [[ -z "${skip_ndp_val:-}" ]]; then
 fi
 if [[ "${skip_ndp_val:-0}" = "1" ]]; then
   log_info "Mode HE détecté: ndppd désactivé (routed /64, pas de proxy NDP nécessaire)"
+  # Assurer l'arrêt et la désactivation du service, même si installé via paquets
+  systemctl disable --now ndppd >/dev/null 2>&1 || true
 else
   log_info "Écriture ndppd.conf..."
   sed -e "s|\${INTERFACE}|$interface|g" \

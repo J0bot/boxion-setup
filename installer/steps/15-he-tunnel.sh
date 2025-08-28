@@ -84,6 +84,14 @@ fi
 HE_TUN_MTU="1480"
 read -r -p "MTU du tunnel [1480]: " inp; HE_TUN_MTU="${inp:-$HE_TUN_MTU}"
 
+# Sanitize inputs
+# - Ensure client is in form <ip>/64
+# - Ensure server is a bare IPv6 address without prefix
+client_no_pref="${HE_TUN_CLIENT6%%/*}"
+HE_TUN_CLIENT6="${client_no_pref}/64"
+srv_no_pref="${HE_TUN_SERVER6%%/*}"
+HE_TUN_SERVER6="${srv_no_pref}"
+
 # Persist environment for service
 ensure_dir /etc/boxion
 cat > /etc/boxion/he6in4.env <<EOF
@@ -107,7 +115,7 @@ Wants=network-online.target
 Type=oneshot
 RemainAfterExit=yes
 EnvironmentFile=/etc/boxion/he6in4.env
-ExecStart=/bin/sh -c 'modprobe sit; ip tunnel add he-ipv6 mode sit remote "$HE_SERVER_V4" local "$MY_V4" ttl 255 || true; ip link set he-ipv6 mtu "$HE_TUN_MTU" up; ip -6 addr add "$HE_TUN_CLIENT6" dev he-ipv6 || true; iptables -C INPUT -p 41 -j ACCEPT 2>/dev/null || iptables -I INPUT -p 41 -j ACCEPT; if [ "$USE_HE_DEFAULT_ROUTE" = "1" ]; then ip -6 route replace default via "$HE_TUN_SERVER6" dev he-ipv6 metric 10; fi'
+ExecStart=/bin/sh -c 'modprobe sit; ip tunnel add he-ipv6 mode sit remote "$HE_SERVER_V4" local "$MY_V4" ttl 255 || true; ip link set he-ipv6 mtu "$HE_TUN_MTU" up; ip -6 addr add "$HE_TUN_CLIENT6" dev he-ipv6 || true; if command -v iptables >/dev/null 2>&1; then iptables -C INPUT -p 41 -j ACCEPT 2>/dev/null || iptables -I INPUT -p 41 -j ACCEPT; fi; if [ "$USE_HE_DEFAULT_ROUTE" = "1" ]; then ip -6 route replace default via "$HE_TUN_SERVER6" dev he-ipv6 metric 10; fi'
 ExecStop=/bin/sh -c 'ip -6 route del default dev he-ipv6 2>/dev/null || true; ip link set he-ipv6 down 2>/dev/null || true; ip tunnel del he-ipv6 2>/dev/null || true'
 
 [Install]
