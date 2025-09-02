@@ -44,6 +44,17 @@ log_info "Nettoyage Nginx..."
 rm -f /etc/nginx/sites-enabled/boxion-api /etc/nginx/sites-available/boxion-api
 rm -f /etc/nginx/conf.d/boxion-rate.conf
 rm -f /etc/nginx/.htpasswd-boxion
+rm -f /etc/nginx/boxion-stream.conf
+rm -f /etc/nginx/conf.d/boxion-http-proxy.conf
+rm -rf /etc/nginx/boxion
+
+# Retirer l'include injecté dans nginx.conf (si présent)
+if grep -qF "/etc/nginx/boxion-stream.conf" /etc/nginx/nginx.conf 2>/dev/null; then
+  sed -i.bak \
+    -e '/# Boxion stream include/d' \
+    -e '/include \/etc\/nginx\/boxion-stream.conf;/d' \
+    /etc/nginx/nginx.conf || true
+fi
 
 log_info "Nettoyage API/WWW..."
 rm -rf /var/www/boxion-api
