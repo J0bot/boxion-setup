@@ -4,7 +4,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 source "$SCRIPT_DIR/../lib/common.sh"
 
-API_DIR="/var/www/boxion-api"
+API_DIR="${BOXION_API_DIR:-$REPO_DIR/server}"
 server_name="${BOXION_DOMAIN:-_}"
 
 # Détection socket PHP-FPM
@@ -32,7 +32,7 @@ rm -f /etc/nginx/sites-enabled/default
 # Rate limit zone in http{} context
 install -m 0644 "$REPO_DIR/server/nginx/boxion-rate.conf" /etc/nginx/conf.d/boxion-rate.conf
 
-touch /etc/nginx/.htpasswd-boxion || true
+[[ -f /etc/nginx/.htpasswd-boxion ]] || touch /etc/nginx/.htpasswd-boxion
 
 nginx -t && systemctl reload nginx
 

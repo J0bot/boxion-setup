@@ -4,7 +4,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 source "$SCRIPT_DIR/../lib/common.sh"
 
-API_DIR="/var/www/boxion-api"
+API_DIR="${BOXION_API_DIR:-/var/www/boxion-api}"
 ensure_dir "$API_DIR/api"
 ensure_dir "$API_DIR/admin"
 
@@ -200,7 +200,9 @@ if [[ -z "${api_token_current:-}" ]]; then
 fi
 set_env_var ENDPOINT_PORT 51820
 
-chown -R www-data:www-data "$API_DIR"
+if [[ "$API_DIR" == /var/www/* ]]; then
+  chown -R www-data:www-data "$API_DIR"
+fi
 
 # Assurer PHP-FPM actif
 if systemctl list-unit-files | grep -q '^php8.2-fpm\.service'; then
