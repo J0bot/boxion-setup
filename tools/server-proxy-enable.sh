@@ -44,7 +44,7 @@ fi
 # Ensure nginx.conf includes the stream file at top-level
 NGINX_CONF="/etc/nginx/nginx.conf"
 if ! grep -qF "/etc/nginx/boxion-stream.conf" "$NGINX_CONF"; then
-  cp -a "$NGINX_CONF"{",.bak-boxion-$(date +%s)}
+  cp -a "$NGINX_CONF" "${NGINX_CONF}.bak-boxion-`date +%s`"
   printf "\n# Boxion stream include\ninclude /etc/nginx/boxion-stream.conf;\n" >> "$NGINX_CONF"
   echo "Injected include into $NGINX_CONF (backup created)."
 fi
