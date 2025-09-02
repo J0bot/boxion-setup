@@ -9,11 +9,15 @@ ensure_dir "$API_DIR/api"
 ensure_dir "$API_DIR/admin"
 
 log_info "Déploiement des fichiers API..."
-install -m 0644 "$REPO_DIR/server/api/index.php" "$API_DIR/api/index.php"
-install -m 0644 "$REPO_DIR/server/admin/index.php" "$API_DIR/admin/index.php"
+SRC="$REPO_DIR/server/api/index.php";   DST="$API_DIR/api/index.php";
+if [[ ! "$SRC" -ef "$DST" ]]; then install -m 0644 "$SRC" "$DST"; fi
+SRC="$REPO_DIR/server/admin/index.php"; DST="$API_DIR/admin/index.php";
+if [[ ! "$SRC" -ef "$DST" ]]; then install -m 0644 "$SRC" "$DST"; fi
 install -m 0644 "$REPO_DIR/server/web/index.html" "$API_DIR/index.html"
-install -m 0644 "$REPO_DIR/server/admin/status.php" "$API_DIR/admin/status.php"
-install -m 0644 "$REPO_DIR/server/admin/probe.php" "$API_DIR/admin/probe.php"
+SRC="$REPO_DIR/server/admin/status.php"; DST="$API_DIR/admin/status.php";
+if [[ ! "$SRC" -ef "$DST" ]]; then install -m 0644 "$SRC" "$DST"; fi
+SRC="$REPO_DIR/server/admin/probe.php";  DST="$API_DIR/admin/probe.php";
+if [[ ! "$SRC" -ef "$DST" ]]; then install -m 0644 "$SRC" "$DST"; fi
 
 # Helper root pour appliquer les peers WG (idempotent + runtime)
 cat > /usr/local/sbin/boxion-wg-apply <<'EOF'
