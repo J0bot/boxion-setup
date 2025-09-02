@@ -131,8 +131,8 @@ Wants=network-online.target
 Type=oneshot
 RemainAfterExit=yes
 EnvironmentFile=/etc/boxion/he6in4.env
-ExecStart=/bin/sh -c 'modprobe sit; ip tunnel add he-ipv6 mode sit remote "$HE_SERVER_V4" local "$MY_V4" ttl 255 || true; ip link set he-ipv6 mtu "$HE_TUN_MTU" up; ip -6 addr add "$HE_TUN_CLIENT6" dev he-ipv6 || true; if command -v iptables >/dev/null 2>&1; then iptables -C INPUT -p 41 -j ACCEPT 2>/dev/null || iptables -I INPUT -p 41 -j ACCEPT; fi; if [ "$USE_HE_DEFAULT_ROUTE" = "1" ]; then ip -6 route replace default via "$HE_TUN_SERVER6" dev he-ipv6 metric 10; fi'
-ExecStop=/bin/sh -c 'ip -6 route del default dev he-ipv6 2>/dev/null || true; ip link set he-ipv6 down 2>/dev/null || true; ip tunnel del he-ipv6 2>/dev/null || true'
+ExecStart=/bin/sh -c 'modprobe sit; ip tunnel add he-ipv6 mode sit remote "$HE_SERVER_V4" local "$MY_V4" ttl 255 || true; ip link set he-ipv6 mtu "$HE_TUN_MTU" up; ip -6 addr add "$HE_TUN_CLIENT6" dev he-ipv6 || true; if command -v iptables >/dev/null 2>&1; then iptables -C INPUT -p 41 -j ACCEPT 2>/dev/null || iptables -I INPUT -p 41 -j ACCEPT; fi; if [ "$USE_HE_DEFAULT_ROUTE" = "1" ]; then ip -6 route replace default via "$HE_TUN_SERVER6" dev he-ipv6 metric 10; else SRC_PREF="${HE_ROUTED_PREFIX:-$HE_ROUTED64}"; if [ -n "$SRC_PREF" ]; then ip -6 rule show | grep -q "from $SRC_PREF .* table 100" || ip -6 rule add from "$SRC_PREF" table 100 priority 1000; ip -6 route replace default via "$HE_TUN_SERVER6" dev he-ipv6 table 100; fi; fi'
+ExecStop=/bin/sh -c 'SRC_PREF="${HE_ROUTED_PREFIX:-$HE_ROUTED64}"; if [ "$USE_HE_DEFAULT_ROUTE" = "1" ]; then ip -6 route del default dev he-ipv6 2>/dev/null || true; else if [ -n "$SRC_PREF" ]; then while ip -6 rule show | grep -q "from $SRC_PREF .* table 100"; do ip -6 rule del from "$SRC_PREF" table 100 2>/dev/null || true; done; ip -6 route flush table 100 2>/dev/null || true; fi; fi; ip link set he-ipv6 down 2>/dev/null || true; ip tunnel del he-ipv6 2>/dev/null || true'
 
 [Install]
 WantedBy=multi-user.target

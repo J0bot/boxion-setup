@@ -42,9 +42,24 @@ sudo bash installer/install.sh --domain tunnel.milkywayhub.org --email admin@exa
 sudo BOXION_DOMAIN=tunnel.milkywayhub.org BOXION_LE_EMAIL=admin@example.com bash installer/install.sh
 ```
 
+- Ne modifie pas votre DNS Infomaniak: créez l’AAAA `tunnel.milkywayhub.org` manuellement vers l’IPv6 native du VPS.
+- Récupérer le token maître après installation: `grep ^API_TOKEN /etc/boxion/boxion.env`.
+- Tester l’API: `curl -6 -H "Authorization: Bearer $API_TOKEN" https://tunnel.milkywayhub.org/api/status`.
+
 **Le serveur configure WireGuard, NDP proxy, API, Dashboard et TLS (Let's Encrypt).**
 
 ---
+
+## ✅ Checklist de mise en service (rapide)
+
+1. *DNS*: créer l’AAAA `tunnel.milkywayhub.org` → IPv6 native du VPS (Infomaniak, manuel).
+2. *Pare-feu / Security groups*: ouvrir 80/tcp, 443/tcp, 51820/udp, et si HE: protocole 41 (IPv4).
+3. *Installer le serveur*: voir section « Serveur Tunnel (VPS) » plus bas.
+4. *Récupérer le token*: `cat /etc/boxion/boxion.env` → `API_TOKEN=...`.
+5. *Tester l’API*: `curl -6 -H "Authorization: Bearer $API_TOKEN" https://tunnel.milkywayhub.org/api/status`.
+6. *Enrôler un client*: section « Client Boxion » (mode interactif ou non-interactif).
+7. *Vérifier côté client*: `curl -6 https://api64.ipify.org` → retourne son /128.
+8. *Publier l’AAAA client*: sous-domaine → IPv6 /128 de la Boxion (Infomaniak, manuel).
 
 ## 📋 Installation Détaillée
 
@@ -69,6 +84,14 @@ chmod +x client-setup.sh
 **2️⃣ Exécuter l'installation :**
 ```bash
 sudo ./client-setup.sh
+```
+
+Ou en mode non-interactif (pratique pour scripts/CI):
+
+```bash
+export BOXION_SERVER_URL="https://tunnel.milkywayhub.org"
+export BOXION_API_TOKEN="...token maître ou OTP..."
+sudo -E ./client-setup.sh
 ```
 
 **3️⃣ Configurer interactivement :**
@@ -119,6 +142,15 @@ sudo bash tools/client-fix.sh
   sudo ufw allow 51820/udp
   # Pour HE 6in4 (protocole 41 via IPv4)
   sudo iptables -I INPUT -p 41 -j ACCEPT
+  ```
+
+- **nftables (exemple générique)** — à adapter à vos tables/chaînes existantes:
+
+  ```bash
+  sudo nft add rule inet filter input tcp dport {80,443} accept
+  sudo nft add rule inet filter input udp dport 51820 accept
+  # ICMPv6 indispensable (PMTUD, Neighbor Discovery)
+  sudo nft add rule inet filter input ip6 nexthdr icmpv6 accept
   ```
 
 - **Infomaniak/OpenStack**: vérifiez aussi les règles de sécurité (security groups) côté cloud.
