@@ -21,10 +21,25 @@ else
 fi
 [[ -z "$php_fpm_sock" ]] && php_fpm_sock="/run/php/php-fpm.sock"
 
-sed -e "s|\${SERVER_NAME}|$server_name|g" \
-    -e "s|\${API_DIR}|$API_DIR|g" \
-    -e "s|\${PHP_FPM_SOCK}|$php_fpm_sock|g" \
-    "$REPO_DIR/server/nginx/boxion-api.conf.tmpl" > /etc/nginx/sites-available/boxion-api
+# Substitution du template
+if command -v envsubst >/dev/null 2>&1; then
+  # Préférer envsubst quand disponible
+  export SERVER_NAME="$server_name"
+  export API_DIR
+  export PHP_FPM_SOCK="$php_fpm_sock"
+  envsubst '${SERVER_NAME} ${API_DIR} ${PHP_FPM_SOCK}' \
+    < "$REPO_DIR/server/nginx/boxion-api.conf.tmpl" \
+    > /etc/nginx/sites-available/boxion-api
+else
+  # Fallback: sed avec échappement sûr
+  server_name_esc=$(printf '%s' "$server_name" | sed -e 's/[\\\/&]/\\&/g')
+  api_dir_esc=$(printf '%s' "$API_DIR" | sed -e 's/[\\\/&]/\\&/g')
+  php_fpm_sock_esc=$(printf '%s' "$php_fpm_sock" | sed -e 's/[\\\/&]/\\&/g')
+  sed -e "s|\\${SERVER_NAME}|$server_name_esc|g" \
+      -e "s|\\${API_DIR}|$api_dir_esc|g" \
+      -e "s|\\${PHP_FPM_SOCK}|$php_fpm_sock_esc|g" \
+      "$REPO_DIR/server/nginx/boxion-api.conf.tmpl" > /etc/nginx/sites-available/boxion-api
+fi
 
 ln -sf /etc/nginx/sites-available/boxion-api /etc/nginx/sites-enabled/
 rm -f /etc/nginx/sites-enabled/default

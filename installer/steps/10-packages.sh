@@ -14,7 +14,7 @@ log_info "Installation des dépendances..."
 apt-get install -y \
   wireguard nginx php-fpm php-sqlite3 php-json php-curl \
   sqlite3 iptables ndppd openssl curl procps \
-  certbot python3-certbot-nginx jq >/dev/null
+  certbot python3-certbot-nginx jq gettext-base >/dev/null
 
 log_success "Paquets installés"
 
