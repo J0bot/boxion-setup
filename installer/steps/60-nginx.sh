@@ -47,8 +47,6 @@ rm -f /etc/nginx/sites-enabled/default
 # Rate limit zone in http{} context
 install -m 0644 "$REPO_DIR/server/nginx/boxion-rate.conf" /etc/nginx/conf.d/boxion-rate.conf
 
-[[ -f /etc/nginx/.htpasswd-boxion ]] || touch /etc/nginx/.htpasswd-boxion
-
 nginx -t && systemctl reload nginx
 
 log_success "Nginx configuré"
