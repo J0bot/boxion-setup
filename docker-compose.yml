@@ -1,0 +1,81 @@
+networks:
+  boxion:
+    name: boxion
+    external: true
+  boxion-edge:
+    name: boxion-edge
+    external: true
+    # Create once: docker network create boxion-edge
+
+volumes:
+  boxion-etc:
+  boxion-var:
+  boxion-wg:
+
+services:
+  proxy:
+    build: ./docker/proxy
+    container_name: boxion-proxy
+    restart: unless-stopped
+    # Front all traffic; keep ports free for Caddy, which runs behind this proxy on the same network
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./data/nginx-maps:/etc/nginx/boxion
+    networks:
+      - boxion
+      - boxion-edge
+    depends_on:
+      - api
+
+  api:
+    build: ./docker/api
+    container_name: boxion-api
+    restart: unless-stopped
+    expose:
+      - "8080"
+    volumes:
+      - ./server:/var/www/boxion:ro
+      - boxion-etc:/etc/boxion
+      - boxion-var:/var/lib/boxion
+      - ./data/nginx-maps:/etc/nginx/boxion
+      - ./docker/api/conf.d:/etc/nginx/conf.d:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Optional: mount a htpasswd file if you want HTTP Basic auth
+      # - ./data/htpasswd-boxion:/etc/nginx/.htpasswd-boxion:ro
+    networks:
+      - boxion
+
+  net:
+    build:
+      context: .
+      dockerfile: docker/net/Dockerfile
+    container_name: boxion-net
+    restart: unless-stopped
+    privileged: true
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    devices:
+      - "/dev/net/tun:/dev/net/tun"
+    volumes:
+      - boxion-etc:/etc/boxion
+      - boxion-var:/var/lib/boxion
+      - boxion-wg:/etc/wireguard
+      - /lib/modules:/lib/modules:ro
+
+  smtp:
+    build:
+      context: .
+      dockerfile: docker/smtp/Dockerfile
+    container_name: boxion-smtp
+    restart: unless-stopped
+    # Listen directly on host ports for IPv4/IPv6 reachability
+    network_mode: host
+    environment:
+      - TZ=UTC
+    volumes:
+      - boxion-etc:/etc/boxion
+      - boxion-var:/var/lib/boxion

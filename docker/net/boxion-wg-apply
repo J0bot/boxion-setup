@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+WG_IF="wg0"
+WG_CONF="/etc/wireguard/wg0.conf"
+LOCK_FILE="/run/boxion-wg.lock"
+
+usage() { echo "Usage: $0 add-peer <pubkey> <ipv6/128>" >&2; }
+
+cmd="${1:-}"; shift || true
+case "$cmd" in
+  add-peer)
+    pubkey="${1:-}"; ipv6="${2:-}"
+    if [[ -z "$pubkey" || -z "$ipv6" ]]; then usage; exit 2; fi
+    if ! [[ "$pubkey" =~ ^[A-Za-z0-9+/]{43}=$ ]]; then echo "Invalid pubkey" >&2; exit 2; fi
+    if ! echo "$ipv6" | grep -Eq '^[0-9a-fA-F:]+/128$'; then echo "Invalid IPv6" >&2; exit 2; fi
+
+    # Lock to avoid concurrent writes
+    exec 9>"$LOCK_FILE" || true
+    flock 9 || true
+
+    # Ensure interface is up
+    if ! ip link show "$WG_IF" >/dev/null 2>&1; then
+      wg-quick up "$WG_IF" >/dev/null 2>&1 || true
+    fi
+
+    # Apply to runtime (creates peer if missing, updates allowed-ips otherwise)
+    wg set "$WG_IF" peer "$pubkey" allowed-ips "$ipv6"
+
+    # Persist in config if not already present
+    umask 077
+    if ! grep -q "^PublicKey = ${pubkey}$" "$WG_CONF" 2>/dev/null; then
+      {
+        printf "\n[Peer]\n"
+        printf "PublicKey = %s\n" "$pubkey"
+        printf "AllowedIPs = %s\n" "$ipv6"
+      } >> "$WG_CONF"
+    fi
+    ;;
+  *) usage; exit 2;;
+esac

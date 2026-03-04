@@ -57,11 +57,16 @@ if [[ ! -f "$HTTP_CONF" ]]; then
 # Requires this file to be included inside http {} (Debian default)
 map $host $boxion_http_upstream {
     include /etc/nginx/boxion/http.map;
+    # If host is not mapped, send to a blackhole upstream to avoid
+    # falling back to another vhost.
     default 127.0.0.1:18080;
 }
 
 server {
-    listen 0.0.0.0:80;
+    # Be the default server for both IPv4 and IPv6 to capture all HTTP traffic
+    # and route by Host header using the map above.
+    listen 0.0.0.0:80 default_server;
+    listen [::]:80 default_server;
     access_log off;
     location / {
         proxy_set_header Host $host;

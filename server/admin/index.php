@@ -92,9 +92,6 @@ code{background:#0f1530;border:1px solid #33406b;border-radius:6px;padding:.2rem
   // ===== Proxy IPv4->IPv6 (Nginx) =====
   $proxyMsg = '';
   $proxyErr = '';
-  $toolsAdd    = realpath(__DIR__ . '/../../tools/server-proxy-add.sh');
-  $toolsRm     = realpath(__DIR__ . '/../../tools/server-proxy-remove.sh');
-  $toolsEnable = realpath(__DIR__ . '/../../tools/server-proxy-enable.sh');
   $httpMapPath = '/etc/nginx/boxion/http.map';
   $tlsMapPath  = '/etc/nginx/boxion/tls.map';
 
@@ -113,27 +110,16 @@ code{background:#0f1530;border:1px solid #33406b;border-radius:6px;padding:.2rem
           if (strpos($ipv6, ':') === false) { $proxyErr = 'IPv6 invalide'; }
       }
 
-      // chemins scripts
       if (!$proxyErr) {
           if ($act === 'proxy_add') {
-              if (!$toolsAdd || !is_file($toolsAdd)) { $proxyErr = 'Script add introuvable'; }
-          } elseif ($act === 'proxy_remove') {
-              if (!$toolsRm || !is_file($toolsRm)) { $proxyErr = 'Script remove introuvable'; }
-          } elseif ($act === 'proxy_enable') {
-              if (!$toolsEnable || !is_file($toolsEnable)) { $proxyErr = 'Script enable introuvable'; }
-          }
-      }
-
-      if (!$proxyErr) {
-          if ($act === 'proxy_add') {
-              $cmd = 'sudo /usr/bin/env bash ' . escapeshellarg($toolsAdd) . ' '
+              $cmd = 'sudo /usr/local/sbin/boxion-proxy-add '
                    . escapeshellarg($domain) . ' ' . escapeshellarg($ipv6) . ' '
                    . escapeshellarg($http_port) . ' ' . escapeshellarg($tls_port) . ' 2>&1';
           } elseif ($act === 'proxy_remove') { // remove
-              $cmd = 'sudo /usr/bin/env bash ' . escapeshellarg($toolsRm) . ' '
+              $cmd = 'sudo /usr/local/sbin/boxion-proxy-remove '
                    . escapeshellarg($domain) . ' 2>&1';
           } else { // enable
-              $cmd = 'sudo /usr/bin/env bash ' . escapeshellarg($toolsEnable) . ' 2>&1';
+              $cmd = 'sudo /usr/local/sbin/boxion-proxy-reload 2>&1';
           }
           $out = [];$rc = 0;
           exec($cmd, $out, $rc);

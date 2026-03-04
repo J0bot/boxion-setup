@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# Usage: boxion-proxy-add <domain> <ipv6> [http_port] [tls_port]
+# Edits /etc/nginx/boxion/{http.map,tls.map} inside API container and reloads proxy via docker exec.
+
+DOMAIN="${1-}"
+IP6RAW="${2-}"
+HTTP_PORT="${3-80}"
+TLS_PORT="${4-443}"
+
+if [[ -z "$DOMAIN" || -z "$IP6RAW" ]]; then
+  echo "Usage: $0 <domain> <ipv6> [http_port] [tls_port]" >&2
+  exit 2
+fi
+
+if ! [[ "$DOMAIN" =~ ^[A-Za-z0-9.-]+$ ]]; then
+  echo "Invalid domain: $DOMAIN" >&2
+  exit 2
+fi
+
+# normalize IPv6 (strip brackets/prefix)
+IP6="$IP6RAW"
+IP6="${IP6#[}"; IP6="${IP6%]}"; IP6="${IP6%%/*}"
+if [[ "$IP6" != *:* ]]; then
+  echo "Not an IPv6 address: $IP6RAW" >&2
+  exit 2
+fi
+
+UP_HTTP="[${IP6}]:${HTTP_PORT}"
+UP_TLS="[${IP6}]:${TLS_PORT}"
+MAP_DIR="/etc/nginx/boxion"
+HTTP_MAP="$MAP_DIR/http.map"
+TLS_MAP="$MAP_DIR/tls.map"
+
+mkdir -p "$MAP_DIR"
+[[ -f "$HTTP_MAP" ]] || echo "# domain  upstream" > "$HTTP_MAP"
+[[ -f "$TLS_MAP"  ]] || echo "# domain  upstream" > "$TLS_MAP"
+
+# replace-or-append domain lines
+TMP=$(mktemp)
+sed -E "/^[[:space:]]*${DOMAIN}[[:space:]]/d" "$HTTP_MAP" > "$TMP" && mv "$TMP" "$HTTP_MAP"
+echo -e "${DOMAIN}\t${UP_HTTP};" >> "$HTTP_MAP"
+
+TMP=$(mktemp)
+sed -E "/^[[:space:]]*${DOMAIN}[[:space:]]/d" "$TLS_MAP" > "$TMP" && mv "$TMP" "$TLS_MAP"
+echo -e "${DOMAIN}\t${UP_TLS};" >> "$TLS_MAP"
+
+# reload proxy container
+if docker exec boxion-proxy nginx -t; then
+  docker exec boxion-proxy nginx -s reload || docker restart boxion-proxy || true
+  echo "Mapped $DOMAIN -> HTTP $UP_HTTP, TLS $UP_TLS"
+else
+  echo "nginx -t failed in proxy container; not reloaded." >&2
+  exit 1
+fi

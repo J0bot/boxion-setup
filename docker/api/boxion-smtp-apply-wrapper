@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# Usage: boxion-smtp-apply set <relay_host> <relay_port> <relay_user> <relay_pass>
+# Writes /etc/boxion/smtp.env and restarts the boxion-smtp container so Postfix reloads config.
+
+CMD="${1-}"
+if [[ "$CMD" != "set" ]]; then
+  echo "Usage: $0 set <relay_host> <relay_port> <relay_user> <relay_pass>" >&2
+  exit 2
+fi
+
+RELAY_HOST="${2-}"
+RELAY_PORT="${3-587}"
+RELAY_USER="${4-}"
+RELAY_PASS="${5-}"
+
+ENV_FILE="/etc/boxion/smtp.env"
+mkdir -p /etc/boxion
+[[ -f "$ENV_FILE" ]] || touch "$ENV_FILE"
+
+set_kv(){ local k="$1" v="$2"; if grep -q "^${k}=" "$ENV_FILE" 2>/dev/null; then sed -i "s|^${k}=.*$|${k}=${v}|" "$ENV_FILE"; else echo "${k}=${v}" >> "$ENV_FILE"; fi }
+
+# Update relay configuration (empty host disables)
+set_kv RELAY_HOST "$RELAY_HOST"
+set_kv RELAY_PORT "$RELAY_PORT"
+set_kv RELAY_USER "$RELAY_USER"
+set_kv RELAY_PASS "$RELAY_PASS"
+
+# Restart smtp container to apply
+if docker ps --format '{{.Names}}' | grep -q '^boxion-smtp$'; then
+  docker restart boxion-smtp >/dev/null
+  echo "SMTP relay updated. Restarted boxion-smtp."
+else
+  echo "Warning: boxion-smtp container not running; changes will apply on next start." >&2
+fi

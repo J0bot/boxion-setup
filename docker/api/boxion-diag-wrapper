@@ -1,0 +1,5 @@
+#!/usr/bin/env sh
+set -e
+# Wrapper inside API container to run diag inside net container
+# Requires /var/run/docker.sock mounted and container_name=boxion-net
+exec docker exec -i boxion-net /usr/local/sbin/boxion-diag "$@"

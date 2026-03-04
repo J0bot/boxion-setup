@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# Usage: boxion-proxy-reload
+# Tests and reloads nginx inside the proxy container.
+
+if docker exec boxion-proxy nginx -t; then
+  docker exec boxion-proxy nginx -s reload || docker restart boxion-proxy || true
+  echo "Proxy reloaded"
+else
+  echo "nginx -t failed in proxy container; not reloaded." >&2
+  exit 1
+fi

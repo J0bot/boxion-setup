@@ -1,0 +1,14 @@
+# Example TLS SNI passthrough routing for Boxion edge proxy
+#
+# Map $ssl_preread_server_name (SNI) to an upstream. The upstream can be
+# - a service name:port on the Docker network (e.g., api:8443 if you terminate TLS there), or
+# - an IPv6 address in brackets with port for true passthrough to a Boxion client IP.
+# The default (in nginx.conf) is caddy:8443 if no match is found.
+#
+# Syntax: <hostname> <upstream>;
+#
+# Route dashboard/API to API container with TLS offload elsewhere (usually not needed):
+# tunnel.milkywayhub.org    api:8443;
+#
+# Example: passthrough to a Boxion-assigned IPv6 endpoint on 443
+# site1.example.org         [2001:db8:1234:5678::120]:443;

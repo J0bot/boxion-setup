@@ -1,0 +1,5 @@
+#!/usr/bin/env sh
+set -e
+# Wrapper inside API container to add peers via net container
+# Usage: boxion-wg-apply add-peer <pubkey> <ipv6/128>
+exec docker exec -i boxion-net /usr/local/sbin/boxion-wg-apply "$@"

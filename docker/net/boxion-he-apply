@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ENV_FILE="/etc/boxion/he6in4.env"
+
+usage(){
+  echo "Usage: $0 set <MY_V4> <HE_SERVER_V4> <HE_TUN_CLIENT6> <HE_TUN_SERVER6> <HE_ROUTED_PREFIX> <HE_TUN_MTU> <USE_HE_DEFAULT_ROUTE:0|1>" >&2
+}
+
+cmd="${1:-}"; shift || true
+case "$cmd" in
+  set)
+    MY_V4="${1:-}"; HE_SERVER_V4="${2:-}"; HE_TUN_CLIENT6="${3:-}"; HE_TUN_SERVER6="${4:-}";
+    HE_ROUTED_PREFIX="${5:-}"; HE_TUN_MTU="${6:-1480}"; USE_HE_DEFAULT_ROUTE="${7:-0}"
+    if [[ -z "$MY_V4" || -z "$HE_SERVER_V4" || -z "$HE_TUN_CLIENT6" || -z "$HE_TUN_SERVER6" || -z "$HE_ROUTED_PREFIX" ]]; then
+      usage; exit 2
+    fi
+    mkdir -p /etc/boxion
+    cat > "$ENV_FILE" <<EOF
+MY_V4=$MY_V4
+HE_SERVER_V4=$HE_SERVER_V4
+HE_TUN_CLIENT6=$HE_TUN_CLIENT6
+HE_TUN_SERVER6=$HE_TUN_SERVER6
+HE_TUN_MTU=$HE_TUN_MTU
+HE_ROUTED_PREFIX=$HE_ROUTED_PREFIX
+USE_HE_DEFAULT_ROUTE=$USE_HE_DEFAULT_ROUTE
+HE_ENABLED=1
+EOF
+    ;;
+  *) usage; exit 2;;
+endcase
+
+# Apply configuration idempotently
+modprobe sit 2>/dev/null || true
+ip tunnel add he-ipv6 mode sit remote "$HE_SERVER_V4" local "$MY_V4" ttl 255 2>/dev/null || true
+ip link set he-ipv6 mtu "${HE_TUN_MTU}" up
+# Ensure client address is present
+ip -6 addr add "$HE_TUN_CLIENT6" dev he-ipv6 2>/dev/null || true
+
+# Routing
+if [[ "${USE_HE_DEFAULT_ROUTE}" == "1" ]]; then
+  ip -6 route replace default via "$HE_TUN_SERVER6" dev he-ipv6 metric 10
+else
+  # Policy-based default route only for traffic sourced from routed prefix
+  SRC_PREF="$HE_ROUTED_PREFIX"
+  if [[ -n "$SRC_PREF" ]]; then
+    if ! ip -6 rule show | grep -q "from $SRC_PREF .* table 100"; then
+      ip -6 rule add from "$SRC_PREF" table 100 priority 1000 || true
+    fi
+    ip -6 route replace default via "$HE_TUN_SERVER6" dev he-ipv6 table 100 || true
+  fi
+fi
+
+echo "HE 6in4 applied"

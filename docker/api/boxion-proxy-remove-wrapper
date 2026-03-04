@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# Usage: boxion-proxy-remove <domain>
+# Removes domain lines from /etc/nginx/boxion maps and reloads proxy container.
+
+DOMAIN="${1-}"
+if [[ -z "$DOMAIN" ]]; then
+  echo "Usage: $0 <domain>" >&2
+  exit 2
+fi
+if ! [[ "$DOMAIN" =~ ^[A-Za-z0-9.-]+$ ]]; then
+  echo "Invalid domain: $DOMAIN" >&2
+  exit 2
+fi
+
+MAP_DIR="/etc/nginx/boxion"
+HTTP_MAP="$MAP_DIR/http.map"
+TLS_MAP="$MAP_DIR/tls.map"
+mkdir -p "$MAP_DIR"
+[[ -f "$HTTP_MAP" ]] || echo "# domain  upstream" > "$HTTP_MAP"
+[[ -f "$TLS_MAP"  ]] || echo "# domain  upstream" > "$TLS_MAP"
+
+TMP=$(mktemp)
+sed -E "/^[[:space:]]*${DOMAIN}[[:space:]]/d" "$HTTP_MAP" > "$TMP" && mv "$TMP" "$HTTP_MAP"
+
+TMP=$(mktemp)
+sed -E "/^[[:space:]]*${DOMAIN}[[:space:]]/d" "$TLS_MAP" > "$TMP" && mv "$TMP" "$TLS_MAP"
+
+if docker exec boxion-proxy nginx -t; then
+  docker exec boxion-proxy nginx -s reload || docker restart boxion-proxy || true
+  echo "Removed mappings for $DOMAIN"
+else
+  echo "nginx -t failed in proxy container; not reloaded." >&2
+  exit 1
+fi

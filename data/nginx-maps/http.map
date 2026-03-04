@@ -1,0 +1,15 @@
+# Example HTTP host routing for Boxion edge proxy
+#
+# Map $host to an upstream. You can route the dashboard/API to the api container
+# and any other public sites to their IPv6 Boxion addresses (handled by ndppd/WireGuard).
+# The default (in nginx.conf) is caddy:8080 if no match is found.
+#
+# Syntax: <hostname> <upstream>;
+#
+# Route dashboard to API container (HTTP)
+# Replace with your domain used to access the dashboard/API
+#
+# tunnel.milkywayhub.org   api:8080;
+#
+# Example: route a public site to its Boxion-assigned IPv6 on port 80
+# site1.example.org        [2001:db8:1234:5678::120]:80;
